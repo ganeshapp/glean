@@ -53,8 +53,8 @@ class AlgoliaService {
 
     if (timeRange.duration != null) {
       final cutoff = DateTime.now().subtract(timeRange.duration!);
-      params['numericFilters'] =
-          'created_at_i>${cutoff.millisecondsSinceEpoch ~/ 1000}';
+      final cutoffSec = cutoff.millisecondsSinceEpoch ~/ 1000;
+      params['numericFilters'] = ['created_at_i>$cutoffSec'];
     }
 
     final response = await _dio.get(endpoint, queryParameters: params);

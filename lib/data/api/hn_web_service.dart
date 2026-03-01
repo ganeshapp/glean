@@ -30,23 +30,42 @@ class HnWebService {
 
   Future<bool> login(String username, String password) async {
     try {
-      await _dio.post(
+      // Do not follow redirects so we can read Set-Cookie from the 302 response
+      final response = await _dio.post(
         '/login',
-        data: 'acct=$username&pw=$password',
+        data: 'acct=${Uri.encodeComponent(username)}&pw=${Uri.encodeComponent(password)}',
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
           followRedirects: false,
-          validateStatus: (status) => status != null && status < 400,
+          validateStatus: (status) => status != null && status <= 302,
         ),
       );
 
-      final cookies = await _cookieJar
-          .loadForRequest(Uri.parse(HnConstants.webBaseUrl));
-      final userCookie = cookies.where((c) => c.name == 'user').firstOrNull;
+      // HN returns 302 with Set-Cookie: user=... on success. Parse from headers.
+      String? userCookieValue;
+      final headers = response.headers;
+      for (final name in ['set-cookie', 'Set-Cookie']) {
+        final values = headers[name];
+        if (values != null) {
+          for (final header in values) {
+            final userMatch = RegExp(r'user=([^;,\s]+)').firstMatch(header);
+            if (userMatch != null) {
+              userCookieValue = userMatch.group(1)!.trim();
+              break;
+            }
+          }
+          if (userCookieValue != null) break;
+        }
+      }
 
-      if (userCookie != null) {
-        await _storage.write(key: 'hn_cookie', value: userCookie.value);
+      if (userCookieValue != null && userCookieValue.isNotEmpty) {
+        await _storage.write(key: 'hn_cookie', value: userCookieValue);
         await _storage.write(key: 'hn_username', value: username);
+        // Also add to cookie jar for subsequent requests from this client
+        _cookieJar.saveFromResponse(
+          Uri.parse(HnConstants.webBaseUrl),
+          [Cookie('user', userCookieValue)..domain = 'news.ycombinator.com'],
+        );
         return true;
       }
 
