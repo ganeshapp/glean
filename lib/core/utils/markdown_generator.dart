@@ -3,6 +3,18 @@ import '../../data/database/app_database.dart';
 class MarkdownGenerator {
   MarkdownGenerator._();
 
+  static String generateFrontmatter(String weekLabel, DateTime publishDate) {
+    final dateStr =
+        '${publishDate.year}-${publishDate.month.toString().padLeft(2, '0')}-${publishDate.day.toString().padLeft(2, '0')}';
+    return '---\n'
+        'title: "$weekLabel"\n'
+        'date: $dateStr\n'
+        'layout: single\n'
+        'collection: weekly\n'
+        'tags: [roundup]\n'
+        '---\n';
+  }
+
   static String generate(String weekLabel, List<BookmarksTableData> bookmarks) {
     final buf = StringBuffer();
     buf.writeln('# $weekLabel\n');
@@ -47,6 +59,9 @@ class MarkdownGenerator {
         final author = c.author ?? 'unknown';
         final url = c.contentUrl ?? '#';
         buf.writeln('-- [$author]($url)\n');
+        if (c.summary != null && c.summary!.isNotEmpty) {
+          buf.writeln('> *${c.summary}*\n');
+        }
         buf.writeln('---\n');
       }
     }
@@ -55,18 +70,16 @@ class MarkdownGenerator {
       buf.writeln('## Tweets\n');
       for (final t in tweets) {
         final text = t.contentText ?? '';
-        final lines = text.split('\n');
-        for (final line in lines) {
-          if (line.trim().isNotEmpty) {
-            buf.writeln('> $line');
-          } else {
-            buf.writeln('>');
-          }
-        }
-        buf.writeln();
         final author = t.author ?? '@unknown';
         final url = t.contentUrl ?? '#';
-        buf.writeln('-- [$author]($url)\n');
+        if (text.isNotEmpty) {
+          buf.writeln('$text -- [$author]($url)\n');
+        } else {
+          buf.writeln('[$author]($url)\n');
+        }
+        if (t.summary != null && t.summary!.isNotEmpty) {
+          buf.writeln('> *${t.summary}*\n');
+        }
         buf.writeln('---\n');
       }
     }
@@ -88,7 +101,10 @@ class MarkdownGenerator {
         }
         final title = w.title ?? w.domain ?? 'Source';
         final url = w.contentUrl ?? '#';
-        buf.writeln('Source: [$title]($url)\n');
+        buf.writeln('[$title]($url)\n');
+        if (w.summary != null && w.summary!.isNotEmpty) {
+          buf.writeln('> *${w.summary}*\n');
+        }
         buf.writeln('---\n');
       }
     }

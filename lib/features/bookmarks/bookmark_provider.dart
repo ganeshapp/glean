@@ -24,6 +24,21 @@ final unpublishedBookmarksStreamProvider =
   return ref.watch(bookmarkRepositoryProvider).watchUnpublished();
 });
 
+final isItemBookmarkedProvider = Provider.family<bool, int>((ref, hnItemId) {
+  final ids = ref.watch(bookmarkedItemIdsProvider);
+  return ids.contains(hnItemId);
+});
+
+final bookmarkedItemIdsProvider = Provider<Set<int>>((ref) {
+  final bookmarks = ref.watch(bookmarksStreamProvider);
+  return bookmarks.whenOrNull(
+    data: (list) => list
+        .where((b) => b.hnItemId != null)
+        .map((b) => b.hnItemId!)
+        .toSet(),
+  ) ?? {};
+});
+
 enum BookmarkFilter { all, articles, comments, external }
 
 final bookmarkFilterProvider = StateProvider<BookmarkFilter>((ref) => BookmarkFilter.all);

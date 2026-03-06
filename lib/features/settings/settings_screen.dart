@@ -406,7 +406,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const ListTile(
                   title: Text('Glean'),
                   subtitle: Text(
-                    'Version 1.0.1',
+                    'Version 1.0.2',
                     style:
                         TextStyle(color: AppColors.textSecondary, fontSize: 13),
                   ),

@@ -1,7 +1,7 @@
 name: glean
 description: "Glean - HN Client + Weekly Curation Publisher"
 publish_to: 'none'
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   sdk: ^3.7.2
@@ -37,6 +37,9 @@ dependencies:
 
   # URL launching
   url_launcher: ^6.3.1
+
+  # Share
+  share_plus: ^10.1.4
 
   # Share receiving
   receive_sharing_intent:

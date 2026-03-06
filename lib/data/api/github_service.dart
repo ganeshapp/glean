@@ -141,6 +141,7 @@ class GitHubService {
   Future<bool> publishFile({
     required String content,
     required String weekLabel,
+    String? frontmatter,
   }) async {
     final token = await _getToken();
     final repo = await getRepo();
@@ -155,9 +156,14 @@ class GitHubService {
         ? await _getFileContent(repo, filePath, token)
         : null;
 
-    final finalContent = existingContent != null
-        ? '$existingContent\n\n$content'
-        : content;
+    String finalContent;
+    if (existingContent != null) {
+      finalContent = '$existingContent\n\n$content';
+    } else {
+      finalContent = frontmatter != null
+          ? '$frontmatter\n$content'
+          : content;
+    }
 
     final encoded = base64Encode(utf8.encode(finalContent));
 

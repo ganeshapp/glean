@@ -79,6 +79,20 @@ class AppDatabase extends _$AppDatabase {
     return delete(bookmarksTable).go();
   }
 
+  Future<bool> isBookmarked(int hnItemId) async {
+    final result = await (select(bookmarksTable)
+          ..where((t) => t.hnItemId.equals(hnItemId))
+          ..limit(1))
+        .get();
+    return result.isNotEmpty;
+  }
+
+  Future<int> deleteByHnItemId(int hnItemId) {
+    return (delete(bookmarksTable)
+          ..where((t) => t.hnItemId.equals(hnItemId)))
+        .go();
+  }
+
   Stream<List<BookmarksTableData>> watchAllBookmarks() {
     return (select(bookmarksTable)
           ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))

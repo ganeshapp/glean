@@ -8,6 +8,8 @@ import '../../data/database/app_database.dart';
 import '../bookmarks/bookmark_provider.dart';
 import 'publish_provider.dart';
 
+
+
 class PublishScreen extends ConsumerStatefulWidget {
   const PublishScreen({super.key});
 
@@ -241,9 +243,15 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
     final selected =
         allBookmarks.where((b) => _selectedIds.contains(b.id)).toList();
     final md = MarkdownGenerator.generate(weekLabel, selected);
+    final frontmatter =
+        MarkdownGenerator.generateFrontmatter(weekLabel, DateTime.now());
 
     final github = ref.read(githubServiceProvider);
-    final ok = await github.publishFile(content: md, weekLabel: weekLabel);
+    final ok = await github.publishFile(
+      content: md,
+      weekLabel: weekLabel,
+      frontmatter: frontmatter,
+    );
 
     if (ok) {
       final ids = selected.map((b) => b.id).toList();

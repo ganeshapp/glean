@@ -8,10 +8,12 @@ class CommentActionsSheet extends StatelessWidget {
     super.key,
     required this.comment,
     required this.onAction,
+    this.isBookmarked = false,
   });
 
   final HnComment comment;
   final void Function(CommentAction action) onAction;
+  final bool isBookmarked;
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +37,12 @@ class CommentActionsSheet extends StatelessWidget {
           _buildAction(context, Icons.person, 'Author profile', CommentAction.authorProfile),
           _buildAction(context, Icons.share, 'Share link to...', CommentAction.shareLink),
           _buildAction(context, Icons.send, 'Send comment text to...', CommentAction.sendText),
-          _buildAction(context, Icons.bookmark_add, 'Bookmark comment', CommentAction.bookmark),
+          _buildAction(
+            context,
+            isBookmarked ? Icons.bookmark_remove : Icons.bookmark_add,
+            isBookmarked ? 'Remove bookmark' : 'Bookmark comment',
+            CommentAction.bookmark,
+          ),
           const SizedBox(height: 8),
         ],
       ),

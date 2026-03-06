@@ -16,9 +16,18 @@ class WeekUtils {
     return weekNumber;
   }
 
+  static int isoWeekYear(DateTime date) {
+    final weekNum = isoWeekNumber(date);
+    if (weekNum >= 52 && date.month == 1) return date.year - 1;
+    if (weekNum == 1 && date.month == 12) return date.year + 1;
+    return date.year;
+  }
+
   static String weekLabel([DateTime? date]) {
     date ??= DateTime.now();
-    return 'Week-${isoWeekNumber(date)}';
+    final year = isoWeekYear(date);
+    final week = isoWeekNumber(date);
+    return '$year${week.toString().padLeft(2, '0')}';
   }
 
   static String weekDateRange([DateTime? date]) {

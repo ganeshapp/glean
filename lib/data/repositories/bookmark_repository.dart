@@ -15,6 +15,8 @@ class BookmarkRepository {
   Future<List<BookmarksTableData>> getUnpublished() => _db.getUnpublishedBookmarks();
   Future<List<BookmarksTableData>> getByType(String type) => _db.getBookmarksByType(type);
 
+  Future<bool> isBookmarked(int hnItemId) => _db.isBookmarked(hnItemId);
+
   Future<int> addBookmark(Bookmark bookmark) {
     return _db.insertBookmark(BookmarksTableCompanion.insert(
       type: bookmark.type.name,
@@ -37,6 +39,8 @@ class BookmarkRepository {
   }
 
   Future<int> deleteBookmark(int id) => _db.deleteBookmark(id);
+
+  Future<int> deleteByHnItemId(int hnItemId) => _db.deleteByHnItemId(hnItemId);
 
   Future<void> markAsPublished(List<int> ids, String weekLabel) {
     return _db.markAsPublished(ids, weekLabel);

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_utils.dart';
@@ -97,7 +99,8 @@ class BookmarksScreen extends ConsumerWidget {
           onDelete: () async {
             await ref.read(bookmarkRepositoryProvider).deleteBookmark(b.id);
           },
-          onEditSummary: () async {
+          onTap: () => _navigateToBookmark(context, b),
+          onLongPress: () async {
             final summary = await BookmarkSummaryDialog.show(
               context,
               initialSummary: b.summary,
@@ -112,18 +115,49 @@ class BookmarksScreen extends ConsumerWidget {
       },
     );
   }
+
+  void _navigateToBookmark(BuildContext context, BookmarksTableData b) {
+    if (b.type == 'hnArticle' && b.hnItemId != null) {
+      context.push('/comments/${b.hnItemId}');
+    } else if (b.type == 'hnComment') {
+      if (b.hnUrl != null) {
+        final storyIdMatch =
+            RegExp(r'id=(\d+)').firstMatch(b.hnUrl!);
+        if (storyIdMatch != null) {
+          context.push('/comments/${storyIdMatch.group(1)}');
+          return;
+        }
+      }
+      if (b.hnItemId != null) {
+        context.push('/comments/${b.hnItemId}');
+      } else if (b.contentUrl != null) {
+        _openUrl(b.contentUrl!);
+      }
+    } else if (b.contentUrl != null) {
+      _openUrl(b.contentUrl!);
+    }
+  }
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 }
 
 class _BookmarkCard extends StatelessWidget {
   const _BookmarkCard({
     required this.bookmark,
     required this.onDelete,
-    required this.onEditSummary,
+    required this.onTap,
+    required this.onLongPress,
   });
 
   final BookmarksTableData bookmark;
   final VoidCallback onDelete;
-  final VoidCallback onEditSummary;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
   IconData get _typeIcon {
     switch (bookmark.type) {
@@ -168,7 +202,8 @@ class _BookmarkCard extends StatelessWidget {
         child: const Icon(Icons.delete, color: Colors.white),
       ),
       child: InkWell(
-        onTap: onEditSummary,
+        onTap: onTap,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(

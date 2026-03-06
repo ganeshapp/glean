@@ -35,7 +35,6 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
   ShareHandler? _shareHandler;
   bool _showTypography = false;
 
-  // For draggable FAB
   Offset? _fabPosition;
 
   @override
@@ -82,39 +81,50 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
       ),
       body: Stack(
         children: [
-          NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) => [
-              SliverAppBar(
-                title: const Text('Glean'),
-                floating: true,
-                snap: true,
-                forceElevated: innerBoxIsScrolled,
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.search),
-                    onPressed: () => context.push('/search'),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: () =>
-                        ref.read(feedNotifierProvider.notifier).refresh(),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.text_fields),
-                    onPressed: () =>
-                        setState(() => _showTypography = !_showTypography),
-                  ),
-                ],
-              ),
-              if (_showTypography)
-                SliverToBoxAdapter(
-                  child: TypographyBar(
-                    onDone: () =>
-                        setState(() => _showTypography = false),
-                  ),
+          ValueListenableBuilder<TypographySettings>(
+            valueListenable: typographyNotifier,
+            builder: (context, typo, _) {
+              return RefreshIndicator(
+                color: AppColors.primary,
+                onRefresh: () =>
+                    ref.read(feedNotifierProvider.notifier).refresh(),
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverAppBar(
+                      title: const Text('Glean'),
+                      floating: true,
+                      snap: true,
+                      actions: [
+                        IconButton(
+                          icon: const Icon(Icons.search),
+                          onPressed: () => context.push('/search'),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.refresh),
+                          onPressed: () =>
+                              ref.read(feedNotifierProvider.notifier).refresh(),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.text_fields),
+                          onPressed: () =>
+                              setState(() => _showTypography = !_showTypography),
+                        ),
+                      ],
+                    ),
+                    if (_showTypography)
+                      SliverToBoxAdapter(
+                        child: TypographyBar(
+                          onDone: () =>
+                              setState(() => _showTypography = false),
+                        ),
+                      ),
+                    _buildSliverContent(feedState, typo),
+                  ],
                 ),
-            ],
-            body: _buildBody(feedState),
+              );
+            },
           ),
           _buildDraggableFab(),
         ],
@@ -159,66 +169,63 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     );
   }
 
-  Widget _buildBody(FeedState state) {
+  Widget _buildSliverContent(FeedState state, TypographySettings typo) {
     if (state.error != null && state.stories.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline,
-                size: 48, color: AppColors.textSecondary),
-            const SizedBox(height: 16),
-            const Text(
-              'Failed to load stories',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () =>
-                  ref.read(feedNotifierProvider.notifier).refresh(),
-              child: const Text('Retry'),
-            ),
-          ],
+      return SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline,
+                  size: 48, color: AppColors.textSecondary),
+              const SizedBox(height: 16),
+              const Text(
+                'Failed to load stories',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () =>
+                    ref.read(feedNotifierProvider.notifier).refresh(),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     if (state.isLoading && state.stories.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+      return const SliverFillRemaining(
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
       );
     }
 
-    return RefreshIndicator(
-      color: AppColors.primary,
-      onRefresh: () => ref.read(feedNotifierProvider.notifier).refresh(),
-      child: ValueListenableBuilder<TypographySettings>(
-        valueListenable: typographyNotifier,
-        builder: (context, typo, _) {
-          return ListView.separated(
-            controller: _scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
-            itemCount: state.stories.length + (state.hasMore ? 1 : 0),
-            separatorBuilder: (_, __) => const Divider(),
-            itemBuilder: (context, index) {
-              if (index >= state.stories.length) {
-                return const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(
-                    child:
-                        CircularProgressIndicator(color: AppColors.primary),
-                  ),
-                );
-              }
-              return StoryCard(
-                story: state.stories[index],
-                fontSize: typo.fontSize,
-                lineHeight: typo.lineHeight,
-              );
-            },
+    return SliverList.separated(
+      itemCount: state.stories.length + (state.hasMore ? 1 : 0),
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        if (index >= state.stories.length) {
+          if (!state.isLoading) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              ref.read(feedNotifierProvider.notifier).loadMore();
+            });
+          }
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
           );
-        },
-      ),
+        }
+        return StoryCard(
+          story: state.stories[index],
+          fontSize: typo.fontSize,
+          lineHeight: typo.lineHeight,
+        );
+      },
     );
   }
 }

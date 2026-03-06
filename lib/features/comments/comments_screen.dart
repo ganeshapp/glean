@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/hn_constants.dart';
@@ -8,7 +9,7 @@ import '../../data/models/bookmark.dart';
 import '../auth/auth_provider.dart';
 import '../auth/login_dialog.dart';
 import '../bookmarks/bookmark_provider.dart';
-import '../bookmarks/widgets/bookmark_summary_dialog.dart';
+import '../feed/widgets/typography_bar.dart';
 import 'comment_provider.dart';
 import 'widgets/comment_actions_sheet.dart';
 import 'widgets/comment_tile.dart';
@@ -24,6 +25,8 @@ class CommentsScreen extends ConsumerStatefulWidget {
 }
 
 class _CommentsScreenState extends ConsumerState<CommentsScreen> {
+  bool _showTypography = false;
+
   @override
   void initState() {
     super.initState();
@@ -69,15 +72,19 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
         });
       case CommentAction.shareLink:
         final url = HnConstants.itemUrl(node.comment.id);
-        _openUrl(url);
+        Share.share(url);
       case CommentAction.authorProfile:
         final url = HnConstants.userUrl(node.comment.by);
         _openUrl(url);
       case CommentAction.sendText:
-        // Will be wired to share functionality
-        break;
+        final text = _stripHtml(node.comment.text ?? '');
+        if (text.isNotEmpty) {
+          Share.share(
+            '$text\n\n-- ${node.comment.by}\n${HnConstants.itemUrl(node.comment.id)}',
+          );
+        }
       case CommentAction.bookmark:
-        _bookmarkComment(node);
+        _toggleCommentBookmark(node);
     }
   }
 
@@ -124,12 +131,23 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
     }
   }
 
-  Future<void> _bookmarkArticle() async {
+  Future<void> _toggleArticleBookmark() async {
+    final repo = ref.read(bookmarkRepositoryProvider);
+    final isAlready = ref.read(isItemBookmarkedProvider(widget.storyId));
+
+    if (isAlready) {
+      await repo.deleteByHnItemId(widget.storyId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bookmark removed')),
+        );
+      }
+      return;
+    }
+
     final state = ref.read(commentsNotifierProvider(widget.storyId));
     final story = state.story;
     if (story == null) return;
-
-    final summary = await BookmarkSummaryDialog.show(context);
 
     final bookmark = Bookmark(
       type: BookmarkType.hnArticle,
@@ -138,10 +156,9 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
       hnUrl: HnConstants.itemUrl(story.id),
       hnItemId: story.id,
       domain: story.domain,
-      summary: (summary != null && summary.isNotEmpty) ? summary : null,
     );
 
-    await ref.read(bookmarkRepositoryProvider).addBookmark(bookmark);
+    await repo.addBookmark(bookmark);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Article bookmarked')),
@@ -149,17 +166,31 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
     }
   }
 
-  void _bookmarkComment(CommentNode node) async {
+  void _toggleCommentBookmark(CommentNode node) async {
+    final repo = ref.read(bookmarkRepositoryProvider);
+    final isAlready = ref.read(isItemBookmarkedProvider(node.comment.id));
+
+    if (isAlready) {
+      await repo.deleteByHnItemId(node.comment.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bookmark removed')),
+        );
+      }
+      return;
+    }
+
     final stripped = _stripHtml(node.comment.text ?? '');
     final bookmark = Bookmark(
       type: BookmarkType.hnComment,
       contentText: stripped,
       contentUrl: HnConstants.itemUrl(node.comment.id),
       hnItemId: node.comment.id,
+      hnUrl: HnConstants.itemUrl(widget.storyId),
       author: node.comment.by,
     );
 
-    await ref.read(bookmarkRepositoryProvider).addBookmark(bookmark);
+    await repo.addBookmark(bookmark);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Comment bookmarked')),
@@ -207,99 +238,142 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
       case 'reply':
         _requireAuth(() => _showReplyDialog(widget.storyId));
       case 'share':
-        _openUrl(HnConstants.itemUrl(widget.storyId));
+        final url = HnConstants.itemUrl(widget.storyId);
+        Share.share(url);
+      case 'typography':
+        setState(() => _showTypography = !_showTypography);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(commentsNotifierProvider(widget.storyId));
+    final isBookmarked = ref.watch(isItemBookmarkedProvider(widget.storyId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Comments'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.open_in_browser),
-            onPressed: () => _openUrl(HnConstants.itemUrl(widget.storyId)),
-          ),
-          IconButton(
-            icon: const Icon(Icons.bookmark_border),
-            onPressed: _bookmarkArticle,
-          ),
-          PopupMenuButton<String>(
-            onSelected: _handleOverflowAction,
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'refresh', child: Text('Refresh')),
-              PopupMenuItem(value: 'upvote', child: Text('Upvote')),
-              PopupMenuItem(value: 'reply', child: Text('Reply')),
-              PopupMenuItem(value: 'share', child: Text('Share link')),
-              PopupMenuItem(value: 'typography', child: Text('Typography')),
+      body: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverAppBar(
+            title: const Text('Comments'),
+            floating: true,
+            snap: true,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.open_in_browser),
+                onPressed: () =>
+                    _openUrl(HnConstants.itemUrl(widget.storyId)),
+              ),
+              IconButton(
+                icon: Icon(
+                  isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                ),
+                onPressed: _toggleArticleBookmark,
+              ),
+              PopupMenuButton<String>(
+                onSelected: _handleOverflowAction,
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'refresh', child: Text('Refresh')),
+                  PopupMenuItem(value: 'upvote', child: Text('Upvote')),
+                  PopupMenuItem(value: 'reply', child: Text('Reply')),
+                  PopupMenuItem(value: 'share', child: Text('Share link')),
+                  PopupMenuItem(
+                      value: 'typography', child: Text('Typography')),
+                ],
+              ),
             ],
           ),
+          if (_showTypography)
+            SliverToBoxAdapter(
+              child: TypographyBar(
+                onDone: () => setState(() => _showTypography = false),
+              ),
+            ),
+          _buildSliverBody(state),
         ],
       ),
-      body: _buildBody(state),
     );
   }
 
-  Widget _buildBody(CommentsState state) {
-    if (state.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+  Widget _buildSliverBody(CommentsState state) {
+    if (state.isLoading && state.commentTree.isEmpty && state.story == null) {
+      return const SliverFillRemaining(
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
       );
     }
 
-    if (state.error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline,
-                size: 48, color: AppColors.textSecondary),
-            const SizedBox(height: 16),
-            Text(state.error!,
-                style: const TextStyle(color: AppColors.textSecondary)),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => ref
-                  .read(commentsNotifierProvider(widget.storyId).notifier)
-                  .load(),
-              child: const Text('Retry'),
-            ),
-          ],
+    if (state.error != null && state.story == null) {
+      return SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline,
+                  size: 48, color: AppColors.textSecondary),
+              const SizedBox(height: 16),
+              Text(state.error!,
+                  style: const TextStyle(color: AppColors.textSecondary)),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => ref
+                    .read(commentsNotifierProvider(widget.storyId).notifier)
+                    .load(),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     final flatList = _flattenTree(state.commentTree);
 
-    return ListView.builder(
-      itemCount: flatList.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          if (state.story == null) return const SizedBox.shrink();
-          return OpHeader(story: state.story!);
-        }
-        final node = flatList[index - 1];
-        return CommentTile(
-          node: node,
-          onToggleCollapse: () {
-            ref
-                .read(commentsNotifierProvider(widget.storyId).notifier)
-                .toggleCollapse(node.comment.id);
-          },
-          onLongPress: () {
-            showModalBottomSheet(
-              context: context,
-              builder: (_) => CommentActionsSheet(
-                comment: node.comment,
-                onAction: (action) => _onCommentAction(action, node),
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          if (index == 0) {
+            if (state.story == null) return const SizedBox.shrink();
+            return OpHeader(story: state.story!);
+          }
+          if (state.isLoading && flatList.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
               ),
             );
-          },
-        );
-      },
+          }
+          final nodeIndex = index - 1;
+          if (nodeIndex >= flatList.length) return const SizedBox.shrink();
+          final node = flatList[nodeIndex];
+          final bookmarkedIds = ref.watch(bookmarkedItemIdsProvider);
+          final isCommentBookmarked =
+              bookmarkedIds.contains(node.comment.id);
+          return CommentTile(
+            node: node,
+            isBookmarked: isCommentBookmarked,
+            onToggleCollapse: () {
+              ref
+                  .read(commentsNotifierProvider(widget.storyId).notifier)
+                  .toggleCollapse(node.comment.id);
+            },
+            onLongPress: () {
+              showModalBottomSheet(
+                context: context,
+                builder: (_) => CommentActionsSheet(
+                  comment: node.comment,
+                  isBookmarked: isCommentBookmarked,
+                  onAction: (action) => _onCommentAction(action, node),
+                ),
+              );
+            },
+          );
+        },
+        childCount: (state.story != null ? 1 : 0) +
+            (state.isLoading && flatList.isEmpty ? 1 : flatList.length),
+      ),
     );
   }
 

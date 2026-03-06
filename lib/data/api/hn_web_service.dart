@@ -90,7 +90,21 @@ class HnWebService {
     return cookie != null && cookie.isNotEmpty;
   }
 
+  Future<void> _restoreCookieIfNeeded() async {
+    final uri = Uri.parse(HnConstants.webBaseUrl);
+    final cookies = await _cookieJar.loadForRequest(uri);
+    if (cookies.any((c) => c.name == 'user')) return;
+    final saved = await _storage.read(key: 'hn_cookie');
+    if (saved != null && saved.isNotEmpty) {
+      _cookieJar.saveFromResponse(
+        uri,
+        [Cookie('user', saved)..domain = 'news.ycombinator.com'],
+      );
+    }
+  }
+
   Future<String?> _fetchAuthToken(int itemId) async {
+    await _restoreCookieIfNeeded();
     try {
       final response = await _dio.get('/item?id=$itemId');
       final doc = html_parser.parse(response.data as String);
@@ -129,6 +143,7 @@ class HnWebService {
   }
 
   Future<String?> _fetchReplyHmac(int parentId) async {
+    await _restoreCookieIfNeeded();
     try {
       final response = await _dio.get('/reply?id=$parentId');
       final doc = html_parser.parse(response.data as String);

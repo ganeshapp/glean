@@ -10,11 +10,13 @@ class CommentTile extends StatelessWidget {
     required this.node,
     required this.onToggleCollapse,
     required this.onLongPress,
+    this.isBookmarked = false,
   });
 
   final CommentNode node;
   final VoidCallback onToggleCollapse;
   final VoidCallback onLongPress;
+  final bool isBookmarked;
 
   Color _depthColor(int depth) {
     return AppColors.commentDepthColors[depth % AppColors.commentDepthColors.length];
@@ -30,6 +32,9 @@ class CommentTile extends StatelessWidget {
       onLongPress: onLongPress,
       child: Container(
         decoration: BoxDecoration(
+          color: isBookmarked
+              ? AppColors.primary.withValues(alpha: 0.06)
+              : null,
           border: Border(
             left: node.depth > 0
                 ? BorderSide(
@@ -62,6 +67,14 @@ class CommentTile extends StatelessWidget {
                     color: AppColors.textSecondary,
                   ),
                 ),
+                if (isBookmarked) ...[
+                  const SizedBox(width: 6),
+                  Icon(
+                    Icons.bookmark,
+                    size: 14,
+                    color: AppColors.primary.withValues(alpha: 0.7),
+                  ),
+                ],
                 if (node.isCollapsed) ...[
                   const SizedBox(width: 8),
                   Container(
