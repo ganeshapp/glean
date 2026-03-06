@@ -84,23 +84,10 @@ class FeedCategoryDrawer extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppColors.primaryDark,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-            child: const Center(
-              child: Text(
-                'HN',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold),
-              ),
-            ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset('hacker-news-square.png',
+                width: 56, height: 56),
           ),
           const Spacer(),
           if (authState.isLoggedIn)
@@ -173,11 +160,15 @@ class FeedCategoryDrawer extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Row(
+        title: Row(
           children: [
-            FlutterLogo(size: 32),
-            SizedBox(width: 12),
-            Text('Glean',
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset('hacker-news-square.png',
+                  width: 32, height: 32),
+            ),
+            const SizedBox(width: 12),
+            const Text('Glean',
                 style: TextStyle(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.bold)),
@@ -194,7 +185,7 @@ class FeedCategoryDrawer extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Version 1.0.4',
+              'Version 1.0.5',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 12),
