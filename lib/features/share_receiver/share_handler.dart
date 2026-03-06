@@ -184,143 +184,195 @@ class ShareHandler {
     final summaryController = TextEditingController();
     final titleController =
         TextEditingController(text: parsed.title ?? '');
+    final urlController =
+        TextEditingController(text: parsed.url ?? '');
+    bool isFetchingTitle = false;
 
     showModalBottomSheet(
       context: _context,
       isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          left: 16,
-          right: 16,
-          top: 16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          Future<void> fetchTitleFromUrl() async {
+            final url = urlController.text.trim();
+            if (url.isEmpty || !url.startsWith('http')) return;
+            setSheetState(() => isFetchingTitle = true);
+            final title = await _fetchPageTitle(url);
+            if (ctx.mounted) {
+              setSheetState(() => isFetchingTitle = false);
+              if (title != null && titleController.text.trim().isEmpty) {
+                titleController.text = title;
+              }
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              left: 16,
+              right: 16,
+              top: 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  parsed.type == BookmarkType.tweet
-                      ? Icons.alternate_email
-                      : Icons.language,
-                  color: AppColors.primary,
+                Row(
+                  children: [
+                    Icon(
+                      parsed.type == BookmarkType.tweet
+                          ? Icons.alternate_email
+                          : Icons.language,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      parsed.type == BookmarkType.tweet
+                          ? 'Save Tweet'
+                          : 'Save Web Snippet',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  parsed.type == BookmarkType.tweet
-                      ? 'Save Tweet'
-                      : 'Save Web Snippet',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                const SizedBox(height: 12),
+                if (parsed.type == BookmarkType.tweet &&
+                    parsed.author != null)
+                  Text(
+                    parsed.author!,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600),
+                  ),
+                if (parsed.text != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      parsed.text!,
+                      maxLines: 5,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 14, color: AppColors.textPrimary),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                if (parsed.type == BookmarkType.website) ...[
+                  TextField(
+                    controller: urlController,
+                    decoration: InputDecoration(
+                      labelText: 'URL',
+                      isDense: true,
+                      suffixIcon: isFetchingTitle
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2),
+                              ),
+                            )
+                          : IconButton(
+                              icon: const Icon(Icons.refresh, size: 20),
+                              onPressed: fetchTitleFromUrl,
+                              tooltip: 'Fetch page title',
+                            ),
+                    ),
+                    keyboardType: TextInputType.url,
+                    onSubmitted: (_) => fetchTitleFromUrl(),
+                  ),
+                  const SizedBox(height: 12),
+                ] else if (parsed.url != null) ...[
+                  Text(
+                    parsed.url!,
+                    style: const TextStyle(
+                        fontSize: 13, color: AppColors.textSecondary),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    labelText: parsed.type == BookmarkType.tweet
+                        ? 'Author handle (optional)'
+                        : 'Page title (optional)',
+                    isDense: true,
                   ),
                 ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: summaryController,
+                  decoration: const InputDecoration(
+                    labelText: 'Summary (optional)',
+                    isDense: true,
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () async {
+                      final authorOrTitle =
+                          titleController.text.trim().isNotEmpty
+                              ? titleController.text.trim()
+                              : null;
+                      final finalUrl =
+                          urlController.text.trim().isNotEmpty
+                              ? urlController.text.trim()
+                              : parsed.url;
+
+                      final bookmark = Bookmark(
+                        type: parsed.type,
+                        title: parsed.type == BookmarkType.website
+                            ? (authorOrTitle ?? parsed.title)
+                            : null,
+                        contentText: parsed.text,
+                        contentUrl: finalUrl,
+                        author: parsed.type == BookmarkType.tweet
+                            ? (authorOrTitle ?? parsed.author)
+                            : null,
+                        summary: summaryController.text.trim().isNotEmpty
+                            ? summaryController.text.trim()
+                            : null,
+                        domain: finalUrl != null
+                            ? Uri.tryParse(finalUrl)?.host
+                            : null,
+                      );
+                      await _ref
+                          .read(bookmarkRepositoryProvider)
+                          .addBookmark(bookmark);
+                      if (ctx.mounted) {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(_context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Saved to bookmarks')),
+                        );
+                      }
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                    ),
+                    child: const Text('Save'),
+                  ),
+                ),
+                const SizedBox(height: 16),
               ],
             ),
-            const SizedBox(height: 12),
-            if (parsed.author != null)
-              Text(
-                parsed.author!,
-                style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600),
-              ),
-            if (parsed.url != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                parsed.url!,
-                style: const TextStyle(
-                    fontSize: 13, color: AppColors.textSecondary),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-            if (parsed.text != null) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceElevated,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  parsed.text!,
-                  maxLines: 5,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 14, color: AppColors.textPrimary),
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            TextField(
-              controller: titleController,
-              decoration: InputDecoration(
-                labelText: parsed.type == BookmarkType.tweet
-                    ? 'Author handle (optional)'
-                    : 'Title (optional)',
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: summaryController,
-              decoration: const InputDecoration(
-                labelText: 'Summary (optional)',
-                isDense: true,
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () async {
-                  final authorOrTitle =
-                      titleController.text.trim().isNotEmpty
-                          ? titleController.text.trim()
-                          : null;
-
-                  final bookmark = Bookmark(
-                    type: parsed.type,
-                    title: parsed.type == BookmarkType.website
-                        ? (authorOrTitle ?? parsed.title)
-                        : null,
-                    contentText: parsed.text,
-                    contentUrl: parsed.url,
-                    author: parsed.type == BookmarkType.tweet
-                        ? (authorOrTitle ?? parsed.author)
-                        : null,
-                    summary: summaryController.text.trim().isNotEmpty
-                        ? summaryController.text.trim()
-                        : null,
-                    domain: parsed.url != null
-                        ? Uri.tryParse(parsed.url!)?.host
-                        : null,
-                  );
-                  await _ref
-                      .read(bookmarkRepositoryProvider)
-                      .addBookmark(bookmark);
-                  if (ctx.mounted) {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(_context).showSnackBar(
-                      const SnackBar(content: Text('Saved to bookmarks')),
-                    );
-                  }
-                },
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                ),
-                child: const Text('Save'),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

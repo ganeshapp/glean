@@ -3,6 +3,8 @@ import '../../data/database/app_database.dart';
 class MarkdownGenerator {
   MarkdownGenerator._();
 
+  static const _newTab = '{:target="_blank"}';
+
   static String generateFrontmatter(String weekLabel, DateTime publishDate) {
     final dateStr =
         '${publishDate.year}-${publishDate.month.toString().padLeft(2, '0')}-${publishDate.day.toString().padLeft(2, '0')}';
@@ -17,11 +19,10 @@ class MarkdownGenerator {
 
   static String generate(String weekLabel, List<BookmarksTableData> bookmarks) {
     final buf = StringBuffer();
-    buf.writeln('# $weekLabel\n');
 
     final articles =
         bookmarks.where((b) => b.type == 'hnArticle').toList();
-    final comments =
+    final quotes =
         bookmarks.where((b) => b.type == 'hnComment').toList();
     final tweets = bookmarks.where((b) => b.type == 'tweet').toList();
     final webSnippets =
@@ -32,37 +33,34 @@ class MarkdownGenerator {
       for (final a in articles) {
         final title = a.title ?? 'Untitled';
         final url = a.contentUrl ?? '#';
-        buf.writeln('### [$title]($url)\n');
-        if (a.summary != null && a.summary!.isNotEmpty) {
-          buf.writeln('> ${a.summary}\n');
-        }
+        final link = '[$title]($url)$_newTab';
         if (a.hnUrl != null) {
-          buf.writeln('[HN Discussion](${a.hnUrl})\n');
+          buf.writeln(
+              '$link [<i class="fab fa-fw fa-hacker-news"></i>](${a.hnUrl})$_newTab');
+        } else {
+          buf.writeln(link);
         }
-        buf.writeln('---\n');
+        if (a.summary != null && a.summary!.isNotEmpty) {
+          buf.writeln(a.summary!);
+        }
+        buf.writeln();
       }
     }
 
-    if (comments.isNotEmpty) {
-      buf.writeln('## Comments\n');
-      for (final c in comments) {
+    if (quotes.isNotEmpty) {
+      buf.writeln('## Quotes\n');
+      for (final c in quotes) {
         final text = c.contentText ?? '';
-        final lines = text.split('\n');
-        for (final line in lines) {
-          if (line.trim().isNotEmpty) {
-            buf.writeln('> $line');
-          } else {
-            buf.writeln('>');
-          }
+        if (text.isNotEmpty) {
+          buf.writeln(text);
         }
-        buf.writeln();
         final author = c.author ?? 'unknown';
         final url = c.contentUrl ?? '#';
-        buf.writeln('-- [$author]($url)\n');
+        buf.writeln('-- [$author]($url)$_newTab');
         if (c.summary != null && c.summary!.isNotEmpty) {
-          buf.writeln('> *${c.summary}*\n');
+          buf.writeln(c.summary!);
         }
-        buf.writeln('---\n');
+        buf.writeln();
       }
     }
 
@@ -73,14 +71,14 @@ class MarkdownGenerator {
         final author = t.author ?? '@unknown';
         final url = t.contentUrl ?? '#';
         if (text.isNotEmpty) {
-          buf.writeln('$text -- [$author]($url)\n');
+          buf.writeln('$text - [$author]($url)$_newTab');
         } else {
-          buf.writeln('[$author]($url)\n');
+          buf.writeln('[$author]($url)$_newTab');
         }
         if (t.summary != null && t.summary!.isNotEmpty) {
-          buf.writeln('> *${t.summary}*\n');
+          buf.writeln(t.summary!);
         }
-        buf.writeln('---\n');
+        buf.writeln();
       }
     }
 
@@ -88,24 +86,17 @@ class MarkdownGenerator {
       buf.writeln('## Web\n');
       for (final w in webSnippets) {
         final text = w.contentText ?? '';
-        if (text.isNotEmpty) {
-          final lines = text.split('\n');
-          for (final line in lines) {
-            if (line.trim().isNotEmpty) {
-              buf.writeln('> $line');
-            } else {
-              buf.writeln('>');
-            }
-          }
-          buf.writeln();
-        }
         final title = w.title ?? w.domain ?? 'Source';
         final url = w.contentUrl ?? '#';
-        buf.writeln('[$title]($url)\n');
-        if (w.summary != null && w.summary!.isNotEmpty) {
-          buf.writeln('> *${w.summary}*\n');
+        if (text.isNotEmpty) {
+          buf.writeln('$text - [$title]($url)$_newTab');
+        } else {
+          buf.writeln('[$title]($url)$_newTab');
         }
-        buf.writeln('---\n');
+        if (w.summary != null && w.summary!.isNotEmpty) {
+          buf.writeln(w.summary!);
+        }
+        buf.writeln();
       }
     }
 
