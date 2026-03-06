@@ -30,10 +30,8 @@ class OpHeader extends StatelessWidget {
             const SizedBox(height: 8),
             GestureDetector(
               onTap: () async {
-                final uri = Uri.parse(story.url!);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
+                await launchUrl(Uri.parse(story.url!),
+                    mode: LaunchMode.externalApplication);
               },
               child: Text(
                 story.url!,

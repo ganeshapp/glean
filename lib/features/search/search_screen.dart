@@ -172,10 +172,8 @@ class _SearchResultCard extends StatelessWidget {
     return InkWell(
       onTap: () async {
         if (hit.url != null && hit.url!.isNotEmpty) {
-          final uri = Uri.parse(hit.url!);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          }
+          await launchUrl(Uri.parse(hit.url!),
+              mode: LaunchMode.externalApplication);
         }
       },
       child: Padding(

@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../auth/auth_provider.dart';
 import '../share_receiver/share_handler.dart';
 import 'feed_provider.dart';
+import 'read_state_provider.dart';
 import 'widgets/feed_category_drawer.dart';
 import 'widgets/story_card.dart';
 import 'widgets/typography_bar.dart';
@@ -14,8 +15,7 @@ enum FeedCategory {
   top('Top', Icons.whatshot),
   newest('New', Icons.bolt),
   ask('Ask HN', Icons.help_outline),
-  show('Show HN', Icons.play_circle_outline),
-  jobs('Jobs', Icons.work_outline);
+  show('Show HN', Icons.play_circle_outline);
 
   const FeedCategory(this.label, this.icon);
   final String label;
@@ -220,10 +220,15 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
             ),
           );
         }
+        final story = state.stories[index];
+        final readIds = ref.watch(readStateProvider);
         return StoryCard(
-          story: state.stories[index],
+          story: story,
           fontSize: typo.fontSize,
           lineHeight: typo.lineHeight,
+          isRead: readIds.contains(story.id),
+          onRead: () =>
+              ref.read(readStateProvider.notifier).markRead(story.id),
         );
       },
     );

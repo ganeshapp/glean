@@ -17,8 +17,6 @@ class StoryRepository {
         return _api.getAskStoryIds();
       case FeedCategory.show:
         return _api.getShowStoryIds();
-      case FeedCategory.jobs:
-        return _api.getJobStoryIds();
     }
   }
 

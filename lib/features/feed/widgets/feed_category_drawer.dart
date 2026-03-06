@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../auth/auth_provider.dart';
@@ -58,6 +59,15 @@ class FeedCategoryDrawer extends ConsumerWidget {
                   onTap: () {
                     Navigator.pop(context);
                     context.push('/settings');
+                  },
+                ),
+                _buildNavTile(
+                  context,
+                  icon: Icons.info_outline,
+                  label: 'About',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showAboutDialog(context);
                   },
                 ),
               ],
@@ -155,6 +165,61 @@ class FeedCategoryDrawer extends ConsumerWidget {
       leading: Icon(icon, color: AppColors.primary),
       title: Text(label, style: const TextStyle(color: AppColors.primary)),
       onTap: onTap,
+    );
+  }
+
+  void _showAboutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Row(
+          children: [
+            FlutterLogo(size: 32),
+            SizedBox(width: 12),
+            Text('Glean',
+                style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'A Hacker News client with weekly curation and publishing to GitHub Pages.',
+              style: TextStyle(
+                  color: AppColors.textSecondary, fontSize: 14, height: 1.5),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Version 1.0.4',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () => launchUrl(Uri.parse('https://www.gapp.in'),
+                  mode: LaunchMode.externalApplication),
+              child: const Text(
+                'Created by Gapp\nwww.gapp.in',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child:
+                const Text('Close', style: TextStyle(color: AppColors.primary)),
+          ),
+        ],
+      ),
     );
   }
 }

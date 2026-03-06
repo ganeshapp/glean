@@ -12,19 +12,21 @@ class StoryCard extends StatelessWidget {
     required this.story,
     this.fontSize = 16.0,
     this.lineHeight = 1.3,
+    this.isRead = false,
+    this.onRead,
   });
 
   final HnStory story;
   final double fontSize;
   final double lineHeight;
+  final bool isRead;
+  final VoidCallback? onRead;
 
   Future<void> _openArticle() async {
     final url = story.url;
     if (url != null && url.isNotEmpty) {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
+      onRead?.call();
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     }
   }
 
@@ -48,7 +50,9 @@ class StoryCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: fontSize,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.textPrimary,
+                      color: isRead
+                          ? AppColors.textSecondary
+                          : AppColors.textPrimary,
                       height: lineHeight,
                     ),
                   ),
@@ -98,7 +102,10 @@ class StoryCard extends StatelessWidget {
 
   Widget _buildCommentButton(BuildContext context) {
     return InkWell(
-      onTap: () => context.push('/comments/${story.id}'),
+      onTap: () {
+        onRead?.call();
+        context.push('/comments/${story.id}');
+      },
       borderRadius: BorderRadius.circular(4),
       child: Padding(
         padding: const EdgeInsets.all(8),
