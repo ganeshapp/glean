@@ -32,6 +32,7 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/release-artifacts/
 
 # Symbolication related
 app.*.symbols
@@ -46,9 +47,6 @@ app.*.map.json
 
 # Cursor / IDE
 .cursor/
-
-# Generated files
-*.g.dart
 
 # Local properties
 android/local.properties
