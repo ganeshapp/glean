@@ -84,9 +84,8 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
       final topComments = await _fetchBatch(story.kids);
       if (_disposed) return;
 
-      final nodes = topComments
-          .map((c) => CommentNode(comment: c, depth: 0))
-          .toList();
+      final nodes =
+          topComments.map((c) => CommentNode(comment: c, depth: 0)).toList();
 
       state = CommentsState(story: story, commentTree: nodes);
 
@@ -141,13 +140,14 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
 
     final nextLevel = <CommentNode>[];
     for (final node in nodes) {
-      final childNodes = node.comment.kids
-          .where((id) => childMap.containsKey(id))
-          .map((id) => CommentNode(
-                comment: childMap[id]!,
-                depth: node.depth + 1,
-              ))
-          .toList();
+      final childNodes =
+          node.comment.kids
+              .where((id) => childMap.containsKey(id))
+              .map(
+                (id) =>
+                    CommentNode(comment: childMap[id]!, depth: node.depth + 1),
+              )
+              .toList();
       node.children = childNodes;
       nextLevel.addAll(childNodes);
     }
@@ -184,8 +184,11 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
   }
 }
 
-final commentsNotifierProvider = StateNotifierProvider.family<
-    CommentsNotifier, CommentsState, int>((ref, storyId) {
-  final api = ref.watch(hnApiServiceProvider);
-  return CommentsNotifier(api, storyId);
-});
+final commentsNotifierProvider =
+    StateNotifierProvider.family<CommentsNotifier, CommentsState, int>((
+      ref,
+      storyId,
+    ) {
+      final api = ref.watch(hnApiServiceProvider);
+      return CommentsNotifier(api, storyId);
+    });

@@ -1,432 +1,361 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../../core/theme/app_colors.dart';
 import '../../data/api/github_service.dart';
 import '../auth/auth_provider.dart';
 import '../auth/login_dialog.dart';
-import '../bookmarks/bookmark_provider.dart';
 import '../publish/publish_provider.dart';
+import '../backup/backup_actions.dart';
+import 'github_sign_in_sheet.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
-
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final _patController = TextEditingController();
-  bool _obscurePat = true;
-  bool _testingConnection = false;
-  bool _loaded = false;
-  bool _loadingRepos = false;
-
-  List<GitHubRepo> _repos = [];
-  String? _selectedRepo;
-  List<GitHubContentItem> _rootFolders = [];
-  String? _selectedRootFolder; // null = Root
-  List<GitHubContentItem> _subfolders = [];
-  String? _selectedSubfolder;
-
+  final folder = TextEditingController(text: '_roundup');
+  final branch = TextEditingController(text: 'main');
+  final site = TextEditingController(text: 'https://www.gapp.in');
+  List<GitHubRepo> repos = [];
+  String? repository, login, error;
+  bool connected = false, busy = true;
+  GitHubService get github => ref.read(githubServiceProvider);
   @override
   void initState() {
     super.initState();
-    _loadGitHubConfig();
+    load();
   }
 
   @override
   void dispose() {
-    _patController.dispose();
+    folder.dispose();
+    branch.dispose();
+    site.dispose();
     super.dispose();
   }
 
-  String get _folderPath {
-    if (_selectedSubfolder != null && _selectedSubfolder!.isNotEmpty) {
-      return _selectedSubfolder!; // full path from repo root
+  Future<void> load() async {
+    try {
+      final session = await github.session();
+      final hasToken = await github.isConnected();
+      final repo = await github.getRepo();
+      final path = await github.getFolder();
+      final savedBranch = await github.getBranch();
+      final url = await github.getSiteUrl();
+      if (!mounted) return;
+      setState(() {
+        login = session?['login'];
+        connected = hasToken;
+        repository = repo;
+        folder.text = path ?? '_roundup';
+        branch.text = savedBranch ?? 'main';
+        site.text = url ?? 'https://www.gapp.in';
+        busy = false;
+      });
+    } catch (e) {
+      fail(e);
     }
-    return _selectedRootFolder ?? '';
   }
 
-  Future<void> _loadGitHubConfig() async {
-    final github = ref.read(githubServiceProvider);
-    final repo = await github.getRepo();
-    final folder = await github.getFolder();
+  void fail(Object e) {
+    if (mounted) {
+      setState(() {
+        busy = false;
+        error = friendlyGitHubError(e);
+      });
+    }
+  }
+
+  Future<void> loadRepos() async {
     setState(() {
-      _selectedRepo = repo;
-      if (folder != null && folder.isNotEmpty) {
-        final parts = folder.split('/');
-        _selectedRootFolder = parts.isNotEmpty ? parts.first : null;
-        _selectedSubfolder =
-            parts.length > 1 ? folder : null; // full path for dropdown match
-      } else {
-        _selectedRootFolder = null;
-        _selectedSubfolder = null;
-      }
-      _loaded = true;
+      busy = true;
+      error = null;
     });
-  }
-
-  Future<void> _loadRepositories() async {
-    final pat = _patController.text.trim();
-    if (pat.isEmpty) return;
-    setState(() => _loadingRepos = true);
-    final github = ref.read(githubServiceProvider);
-    final repos = await github.listRepositories(pat);
-    if (mounted) {
-      setState(() {
-        _repos = repos;
-        _loadingRepos = false;
-        if (_repos.isNotEmpty && !_repos.any((r) => r.fullName == _selectedRepo)) {
-          _selectedRepo = _repos.first.fullName;
-          _rootFolders = [];
-          _subfolders = [];
-          _selectedRootFolder = null;
-          _selectedSubfolder = null;
-          _loadRootFolders();
-        }
-      });
+    try {
+      final list = await github.listRepositories();
+      if (mounted) {
+        setState(() {
+          repos = list;
+          busy = false;
+        });
+      }
+    } catch (e) {
+      fail(e);
     }
   }
 
-  Future<void> _loadRootFolders() async {
-    if (_selectedRepo == null) return;
-    final token = _patController.text.trim();
-    if (token.isEmpty) return;
-    final github = ref.read(githubServiceProvider);
-    final folders =
-        await github.listContents(_selectedRepo!, '', token, dirsOnly: true);
-    if (mounted) {
-      setState(() {
-        _rootFolders = folders;
-        _subfolders = [];
-      });
-      if (_selectedRootFolder != null) await _loadSubfolders();
+  Future<void> chooseRepo(String value) async {
+    setState(() {
+      repository = value;
+      branch.text = repos.firstWhere((r) => r.fullName == value).branch;
+      busy = true;
+      error = null;
+    });
+    try {
+      final url = await github.siteUrlFor(value);
+      if (mounted && repository == value) {
+        setState(() {
+          site.text = url;
+          busy = false;
+        });
+      }
+    } catch (e) {
+      fail(e);
     }
   }
 
-  Future<void> _loadSubfolders() async {
-    if (_selectedRepo == null || _selectedRootFolder == null) return;
-    final token = _patController.text.trim();
-    if (token.isEmpty) return;
-    final github = ref.read(githubServiceProvider);
-    final folders = await github.listContents(
-        _selectedRepo!, _selectedRootFolder!, token, dirsOnly: true);
-    if (mounted) {
-      setState(() {
-        _subfolders = folders;
-        _selectedSubfolder = null;
-      });
-    }
-  }
-
-  Future<void> _saveGitHubConfig() async {
-    final github = ref.read(githubServiceProvider);
-    await github.saveConfig(
-      pat: _patController.text.trim(),
-      repo: _selectedRepo ?? '',
-      folder: _folderPath.isEmpty ? 'weekly' : _folderPath,
-    );
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('GitHub settings saved')),
+  Future<void> browseFolder([String path = '']) async {
+    if (repository == null) return;
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      final folders = await github.listContents(
+        repository!,
+        path,
+        branch.text.trim(),
       );
+      if (!mounted) return;
+      setState(() => busy = false);
+      final selected = await showModalBottomSheet<String>(
+        context: context,
+        isScrollControlled: true,
+        builder:
+            (ctx) => SafeArea(
+              child: SizedBox(
+                height: MediaQuery.of(ctx).size.height * .65,
+                child: Column(
+                  children: [
+                    ListTile(
+                      title: Text(path.isEmpty ? 'Repository folders' : path),
+                      trailing: TextButton(
+                        onPressed: () => Navigator.pop(ctx, 'select:$path'),
+                        child: const Text('Use folder'),
+                      ),
+                    ),
+                    if (path.isNotEmpty)
+                      ListTile(
+                        leading: const Icon(Icons.arrow_upward),
+                        title: const Text('Parent folder'),
+                        onTap:
+                            () => Navigator.pop(
+                              ctx,
+                              'browse:${path.contains('/') ? path.substring(0, path.lastIndexOf('/')) : ''}',
+                            ),
+                      ),
+                    Expanded(
+                      child: ListView(
+                        children:
+                            folders
+                                .map(
+                                  (f) => ListTile(
+                                    leading: const Icon(Icons.folder_outlined),
+                                    title: Text(f.name),
+                                    onTap:
+                                        () => Navigator.pop(
+                                          ctx,
+                                          'browse:${f.path}',
+                                        ),
+                                  ),
+                                )
+                                .toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+      );
+      if (!mounted || selected == null) return;
+      if (selected.startsWith('browse:')) {
+        await browseFolder(selected.substring(7));
+      } else {
+        setState(() => folder.text = selected.substring(7));
+      }
+    } catch (e) {
+      fail(e);
     }
   }
 
-  Future<void> _testConnection() async {
-    await _saveGitHubConfig();
-    setState(() => _testingConnection = true);
-    final github = ref.read(githubServiceProvider);
-    final ok = await github.testConnection();
-    if (mounted) {
-      setState(() => _testingConnection = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(ok
-            ? 'Connection successful!'
-            : 'Connection failed. Check your settings.'),
-      ));
+  Future<void> save() async {
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      await github.testConnection(
+        repository ?? '',
+        folder.text.trim(),
+        branch.text.trim(),
+      );
+      await github.saveConfig(
+        repo: repository ?? '',
+        folder: folder.text.trim(),
+        branch: branch.text.trim(),
+        siteUrl: site.text.trim(),
+      );
+      if (mounted) {
+        setState(() => busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Publishing destination saved')),
+        );
+      }
+    } catch (e) {
+      fail(e);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authNotifierProvider);
-
+    final hn = ref.watch(authNotifierProvider);
+    final knownRepos = {
+      for (final r in repos) r.fullName: r.fullName,
+      if (repository != null && repository!.isNotEmpty)
+        repository!: repository!,
+    };
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: !_loaded
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primary))
-          : ListView(
-              children: [
-                _sectionHeader('HN Account'),
-                ListTile(
-                  title: Text(
-                    authState.isLoggedIn
-                        ? 'Logged in as: ${authState.username}'
-                        : 'Not logged in',
-                  ),
-                  trailing: TextButton(
-                    onPressed: () {
-                      if (authState.isLoggedIn) {
-                        ref.read(authNotifierProvider.notifier).logout();
-                      } else {
-                        LoginDialog.show(context);
-                      }
-                    },
-                    child: Text(authState.isLoggedIn ? 'Logout' : 'Login'),
-                  ),
-                ),
-                const Divider(),
-                _sectionHeader('GitHub Configuration'),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextField(
-                        controller: _patController,
-                        obscureText: _obscurePat,
-                        decoration: InputDecoration(
-                          labelText: 'GitHub PAT Token',
-                          suffixIcon: IconButton(
-                            icon: Icon(_obscurePat
-                                ? Icons.visibility
-                                : Icons.visibility_off),
-                            onPressed: () =>
-                                setState(() => _obscurePat = !_obscurePat),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        onPressed: _loadingRepos ? null : _loadRepositories,
-                        icon: _loadingRepos
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: AppColors.primary),
-                              )
-                            : const Icon(Icons.folder_open, size: 18),
-                        label: Text(_loadingRepos
-                            ? 'Loading…'
-                            : 'Load repositories'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: const BorderSide(color: AppColors.primary),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: _repos.any((r) => r.fullName == _selectedRepo)
-                            ? _selectedRepo
-                            : null,
-                        decoration: const InputDecoration(
-                          labelText: 'Repository',
-                        ),
-                        dropdownColor: AppColors.surfaceElevated,
-                        items: [
-                          if (_selectedRepo != null &&
-                              !_repos.any((r) => r.fullName == _selectedRepo))
-                            DropdownMenuItem(
-                              value: _selectedRepo,
-                              child: Text(
-                                _selectedRepo!,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ..._repos
-                              .map((r) => DropdownMenuItem(
-                                    value: r.fullName,
-                                    child: Text(r.fullName,
-                                        overflow: TextOverflow.ellipsis),
-                                  )),
-                        ],
-                        onChanged: (v) async {
-                          setState(() {
-                            _selectedRepo = v;
-                            _rootFolders = [];
-                            _subfolders = [];
-                            _selectedRootFolder = null;
-                            _selectedSubfolder = null;
-                          });
-                          await _loadRootFolders();
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: _selectedRootFolder,
-                        decoration: const InputDecoration(
-                          labelText: 'Folder',
-                        ),
-                        dropdownColor: AppColors.surfaceElevated,
-                        items: [
-                          const DropdownMenuItem(
-                            value: null,
-                            child: Text('Root'),
-                          ),
-                          ..._rootFolders
-                              .map((d) => DropdownMenuItem(
-                                    value: d.path,
-                                    child: Text(d.name,
-                                        overflow: TextOverflow.ellipsis),
-                                  )),
-                        ],
-                        onChanged: _selectedRepo == null
-                            ? null
-                            : (v) async {
-                                setState(() {
-                                  _selectedRootFolder = v;
-                                  _selectedSubfolder = null;
-                                  _subfolders = [];
-                                });
-                                if (v != null) await _loadSubfolders();
-                              },
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: _selectedSubfolder,
-                        decoration: const InputDecoration(
-                          labelText: 'Subfolder (optional)',
-                        ),
-                        dropdownColor: AppColors.surfaceElevated,
-                        items: [
-                          const DropdownMenuItem(
-                            value: null,
-                            child: Text('—'),
-                          ),
-                          ..._subfolders
-                              .map((d) => DropdownMenuItem(
-                                    value: d.path,
-                                    child: Text(d.name,
-                                        overflow: TextOverflow.ellipsis),
-                                  )),
-                        ],
-                        onChanged: _selectedRootFolder == null
-                            ? null
-                            : (v) {
-                                setState(() => _selectedSubfolder = v);
-                              },
-                      ),
-                      if (_folderPath.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Path: $_folderPath',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed:
-                                  _testingConnection ? null : _testConnection,
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.primary,
-                                side:
-                                    const BorderSide(color: AppColors.primary),
-                              ),
-                              child: _testingConnection
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: AppColors.primary,
-                                      ),
-                                    )
-                                  : const Text('Test Connection'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: FilledButton(
-                              onPressed: _saveGitHubConfig,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                              ),
-                              child: const Text('Save'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                _sectionHeader('Data'),
-                ListTile(
-                  title: const Text('Clear all bookmarks'),
-                  subtitle: const Text(
-                    'Delete all bookmarks from local storage',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                  ),
-                  trailing: const Icon(Icons.delete_outline,
-                      color: AppColors.error),
-                  onTap: () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Clear all bookmarks?'),
-                        content: const Text(
-                            'This will permanently delete all bookmarks.'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('CANCEL'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            child: const Text('DELETE',
-                                style: TextStyle(color: AppColors.error)),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirmed == true) {
-                      await ref.read(bookmarkRepositoryProvider).clearAll();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('All bookmarks cleared')),
-                        );
-                      }
-                    }
-                  },
-                ),
-                const Divider(),
-                _sectionHeader('About'),
-                const ListTile(
-                  title: Text('Glean'),
-                  subtitle: Text(
-                    'Version 1.0.5',
-                    style:
-                        TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                  ),
-                ),
-                const SizedBox(height: 32),
-              ],
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text('Publishing', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              connected
+                  ? 'GitHub connected${login == null ? '' : ' · $login'}'
+                  : 'Connect GitHub',
             ),
-    );
-  }
-
-  Widget _sectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: AppColors.primary,
-        ),
+            subtitle: const Text('Publish roundups to a public repository'),
+            trailing: TextButton(
+              onPressed:
+                  busy
+                      ? null
+                      : () async {
+                        if (connected) {
+                          await github.disconnect();
+                          await load();
+                        } else {
+                          final ok = await showModalBottomSheet<bool>(
+                            context: context,
+                            isScrollControlled: true,
+                            builder: (_) => GitHubSignInSheet(github: github),
+                          );
+                          if (ok == true && mounted) {
+                            await load();
+                            await loadRepos();
+                          }
+                        }
+                      },
+              child: Text(connected ? 'Disconnect' : 'Sign in'),
+            ),
+          ),
+          if (busy) const LinearProgressIndicator(),
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+          if (connected) ...[
+            OutlinedButton.icon(
+              onPressed: busy ? null : loadRepos,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Load repositories'),
+            ),
+            DropdownButtonFormField<String>(
+              isExpanded: true,
+              value: knownRepos.containsKey(repository) ? repository : null,
+              decoration: const InputDecoration(labelText: 'Repository'),
+              items:
+                  knownRepos.keys
+                      .map(
+                        (r) => DropdownMenuItem(
+                          value: r,
+                          child: Text(r, overflow: TextOverflow.ellipsis),
+                        ),
+                      )
+                      .toList(),
+              onChanged:
+                  busy
+                      ? null
+                      : (v) {
+                        if (v != null && repos.any((r) => r.fullName == v)) {
+                          chooseRepo(v);
+                        }
+                      },
+            ),
+            TextField(
+              controller: branch,
+              decoration: const InputDecoration(labelText: 'Branch'),
+            ),
+            TextField(
+              controller: folder,
+              decoration: InputDecoration(
+                labelText: 'Content folder',
+                helperText: 'For gapp.in, choose _roundup.',
+                suffixIcon: IconButton(
+                  tooltip: 'Browse folders',
+                  onPressed: busy || repository == null ? null : browseFolder,
+                  icon: const Icon(Icons.folder_open),
+                ),
+              ),
+            ),
+            TextField(
+              controller: site,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                labelText: 'Website URL',
+                helperText: 'Used to open the published roundup.',
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: busy || repository == null ? null : save,
+              child: const Text('Check and save destination'),
+            ),
+          ],
+          const Divider(height: 40),
+          Text('Your library', style: Theme.of(context).textTheme.titleLarge),
+          ListTile(
+            leading: const Icon(Icons.download_outlined),
+            title: const Text('Back up library and drafts'),
+            subtitle: const Text(
+              'Save a JSON file; GitHub credentials are excluded',
+            ),
+            onTap: () => BackupActions.export(context, ref),
+          ),
+          ListTile(
+            leading: const Icon(Icons.restore),
+            title: const Text('Restore backup'),
+            subtitle: const Text(
+              'Replace local library and drafts from a backup',
+            ),
+            onTap: () => BackupActions.restore(context, ref),
+          ),
+          const Divider(height: 32),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              hn.isLoggedIn ? 'HN · ${hn.username}' : 'Hacker News account',
+            ),
+            trailing: TextButton(
+              onPressed: () async {
+                if (hn.isLoggedIn) {
+                  await ref.read(authNotifierProvider.notifier).logout();
+                } else if (mounted) {
+                  await LoginDialog.show(context);
+                }
+              },
+              child: Text(hn.isLoggedIn ? 'Sign out' : 'Sign in'),
+            ),
+          ),
+        ],
       ),
     );
   }

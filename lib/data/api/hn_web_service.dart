@@ -11,20 +11,20 @@ class HnWebService {
   final CookieJar _cookieJar;
   final FlutterSecureStorage _storage;
 
-  HnWebService({
-    Dio? dio,
-    CookieJar? cookieJar,
-    FlutterSecureStorage? storage,
-  })  : _cookieJar = cookieJar ?? CookieJar(),
-        _storage = storage ?? const FlutterSecureStorage(),
-        _dio = dio ??
-            Dio(BaseOptions(
+  HnWebService({Dio? dio, CookieJar? cookieJar, FlutterSecureStorage? storage})
+    : _cookieJar = cookieJar ?? CookieJar(),
+      _storage = storage ?? const FlutterSecureStorage(),
+      _dio =
+          dio ??
+          Dio(
+            BaseOptions(
               baseUrl: HnConstants.webBaseUrl,
               connectTimeout: const Duration(seconds: 15),
               receiveTimeout: const Duration(seconds: 15),
               followRedirects: false,
               validateStatus: (status) => status != null && status < 400,
-            )) {
+            ),
+          ) {
     _dio.interceptors.add(CookieManager(_cookieJar));
   }
 
@@ -33,7 +33,8 @@ class HnWebService {
       // Do not follow redirects so we can read Set-Cookie from the 302 response
       final response = await _dio.post(
         '/login',
-        data: 'acct=${Uri.encodeComponent(username)}&pw=${Uri.encodeComponent(password)}',
+        data:
+            'acct=${Uri.encodeComponent(username)}&pw=${Uri.encodeComponent(password)}',
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
           followRedirects: false,
@@ -62,10 +63,9 @@ class HnWebService {
         await _storage.write(key: 'hn_cookie', value: userCookieValue);
         await _storage.write(key: 'hn_username', value: username);
         // Also add to cookie jar for subsequent requests from this client
-        _cookieJar.saveFromResponse(
-          Uri.parse(HnConstants.webBaseUrl),
-          [Cookie('user', userCookieValue)..domain = 'news.ycombinator.com'],
-        );
+        _cookieJar.saveFromResponse(Uri.parse(HnConstants.webBaseUrl), [
+          Cookie('user', userCookieValue)..domain = 'news.ycombinator.com',
+        ]);
         return true;
       }
 
@@ -96,10 +96,9 @@ class HnWebService {
     if (cookies.any((c) => c.name == 'user')) return;
     final saved = await _storage.read(key: 'hn_cookie');
     if (saved != null && saved.isNotEmpty) {
-      _cookieJar.saveFromResponse(
-        uri,
-        [Cookie('user', saved)..domain = 'news.ycombinator.com'],
-      );
+      _cookieJar.saveFromResponse(uri, [
+        Cookie('user', saved)..domain = 'news.ycombinator.com',
+      ]);
     }
   }
 

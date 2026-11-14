@@ -1,40 +1,111 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
-
-import '../../core/theme/app_colors.dart';
-import '../../core/utils/date_utils.dart';
 import '../../data/database/app_database.dart';
+import '../capture/save_actions.dart';
 import 'bookmark_provider.dart';
-import 'widgets/bookmark_summary_dialog.dart';
 
-class BookmarksScreen extends ConsumerWidget {
+class BookmarksScreen extends ConsumerStatefulWidget {
   const BookmarksScreen({super.key});
-
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final filter = ref.watch(bookmarkFilterProvider);
-    final bookmarks = ref.watch(filteredBookmarksProvider);
+  ConsumerState<BookmarksScreen> createState() => _BookmarksScreenState();
+}
 
+class _BookmarksScreenState extends ConsumerState<BookmarksScreen> {
+  String query = '';
+  String filter = 'Saved';
+  @override
+  Widget build(BuildContext context) {
+    final bookmarks = ref.watch(bookmarksStreamProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bookmarks'),
+        title: const Text('Saved'),
+        actions: [
+          IconButton(
+            tooltip: 'Settings and backup',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => context.push('/settings'),
+          ),
+        ],
       ),
       body: Column(
         children: [
-          _buildFilterTabs(ref, filter),
-          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              onChanged: (v) => setState(() => query = v.toLowerCase()),
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                hintText: 'Search titles, excerpts, and your thoughts',
+              ),
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children:
+                  ['Saved', 'With thoughts', 'Archived']
+                      .map(
+                        (f) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(f),
+                            selected: filter == f,
+                            onSelected: (_) => setState(() => filter = f),
+                          ),
+                        ),
+                      )
+                      .toList(),
+            ),
+          ),
           Expanded(
             child: bookmarks.when(
-              data: (list) => _buildList(context, ref, list),
-              loading: () => const Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ),
-              error: (e, _) => Center(
-                child: Text('Error: $e',
-                    style: const TextStyle(color: AppColors.textSecondary)),
-              ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error:
+                  (_, _) =>
+                      const Center(child: Text('Could not load saved items.')),
+              data: (all) {
+                final list =
+                    all
+                        .where(
+                          (b) =>
+                              b.archived == (filter == 'Archived') &&
+                              (filter != 'With thoughts' ||
+                                  (b.summary?.isNotEmpty ?? false)) &&
+                              [
+                                    b.title,
+                                    b.contentText,
+                                    b.summary,
+                                    b.domain,
+                                    b.author,
+                                    b.contentUrl,
+                                  ]
+                                  .whereType<String>()
+                                  .join(' ')
+                                  .toLowerCase()
+                                  .contains(query),
+                        )
+                        .toList();
+                if (list.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        query.isNotEmpty
+                            ? 'No matches. Try another search.'
+                            : filter == 'Archived'
+                            ? 'Archived items appear here.'
+                            : 'Save from HN or share a link from another app. Add a thought whenever you want.',
+                      ),
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  itemCount: list.length,
+                  itemBuilder: (_, i) => card(list[i]),
+                );
+              },
             ),
           ),
         ],
@@ -42,257 +113,108 @@ class BookmarksScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildFilterTabs(WidgetRef ref, BookmarkFilter active) {
-    return Container(
-      color: AppColors.surface,
-      child: Row(
-        children: BookmarkFilter.values.map((f) {
-          final isActive = f == active;
-          return Expanded(
-            child: InkWell(
-              onTap: () => ref.read(bookmarkFilterProvider.notifier).state = f,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: isActive ? AppColors.primary : Colors.transparent,
-                      width: 2,
-                    ),
-                  ),
-                ),
-                child: Text(
-                  f.name[0].toUpperCase() + f.name.substring(1),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isActive ? AppColors.primary : AppColors.textSecondary,
-                    fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildList(
-      BuildContext context, WidgetRef ref, List<BookmarksTableData> list) {
-    if (list.isEmpty) {
-      return const Center(
-        child: Text(
-          'No bookmarks yet',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-      );
-    }
-
-    return ListView.separated(
-      itemCount: list.length,
-      separatorBuilder: (_, __) => const Divider(),
-      itemBuilder: (context, index) {
-        final b = list[index];
-        return _BookmarkCard(
-          bookmark: b,
-          onDelete: () async {
-            await ref.read(bookmarkRepositoryProvider).deleteBookmark(b.id);
-          },
-          onTap: () => _navigateToBookmark(context, b),
-          onLongPress: () async {
-            final summary = await BookmarkSummaryDialog.show(
-              context,
-              initialSummary: b.summary,
-            );
-            if (summary != null) {
-              await ref
-                  .read(bookmarkRepositoryProvider)
-                  .updateSummary(b.id, summary);
-            }
-          },
-        );
-      },
-    );
-  }
-
-  void _navigateToBookmark(BuildContext context, BookmarksTableData b) {
-    if (b.type == 'hnArticle' && b.hnItemId != null) {
-      context.push('/comments/${b.hnItemId}');
-    } else if (b.type == 'hnComment') {
-      if (b.hnUrl != null) {
-        final storyIdMatch =
-            RegExp(r'id=(\d+)').firstMatch(b.hnUrl!);
-        if (storyIdMatch != null) {
-          context.push('/comments/${storyIdMatch.group(1)}');
-          return;
-        }
-      }
-      if (b.hnItemId != null) {
-        context.push('/comments/${b.hnItemId}');
-      } else if (b.contentUrl != null) {
-        _openUrl(b.contentUrl!);
-      }
-    } else if (b.contentUrl != null) {
-      _openUrl(b.contentUrl!);
-    }
-  }
-
-  Future<void> _openUrl(String url) async {
-    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-  }
-}
-
-class _BookmarkCard extends StatelessWidget {
-  const _BookmarkCard({
-    required this.bookmark,
-    required this.onDelete,
-    required this.onTap,
-    required this.onLongPress,
-  });
-
-  final BookmarksTableData bookmark;
-  final VoidCallback onDelete;
-  final VoidCallback onTap;
-  final VoidCallback onLongPress;
-
-  IconData get _typeIcon {
-    switch (bookmark.type) {
-      case 'hnArticle':
-        return Icons.article;
-      case 'hnComment':
-        return Icons.chat;
-      case 'tweet':
-        return Icons.alternate_email;
-      case 'website':
-        return Icons.language;
-      default:
-        return Icons.bookmark;
-    }
-  }
-
-  String get _typeLabel {
-    switch (bookmark.type) {
-      case 'hnArticle':
-        return 'Article';
-      case 'hnComment':
-        return 'Comment';
-      case 'tweet':
-        return 'Tweet';
-      case 'website':
-        return 'Web';
-      default:
-        return 'Other';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dismissible(
-      key: ValueKey(bookmark.id),
-      direction: DismissDirection.endToStart,
-      onDismissed: (_) => onDelete(),
-      background: Container(
-        color: AppColors.error,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
+  Widget card(BookmarksTableData b) => Dismissible(
+    key: ValueKey('${b.id}-${b.archived}'),
+    direction: DismissDirection.endToStart,
+    background: Container(
+      color: Theme.of(context).colorScheme.surface,
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.all(20),
+      child: Icon(b.archived ? Icons.unarchive : Icons.archive),
+    ),
+    confirmDismiss: (_) async {
+      await archive(b);
+      return false;
+    },
+    child: Card(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
+        onTap: () => context.push('/saved/${b.id}'),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
+          padding: const EdgeInsets.all(14),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(_typeIcon, size: 20, color: AppColors.primary),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          _typeLabel,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          AppDateUtils.timeAgo(bookmark.createdAt),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        if (bookmark.isPublished) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              bookmark.publishedWeek ?? 'Published',
-                              style: const TextStyle(
-                                  fontSize: 10, color: AppColors.primary),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      bookmark.title ??
-                          bookmark.contentText ??
-                          bookmark.contentUrl ??
-                          'No content',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    if (bookmark.domain != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        bookmark.domain!,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                    if (bookmark.summary != null &&
-                        bookmark.summary!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        bookmark.summary!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
-                  ],
+              Text(
+                '${typeLabel(b.type)}${b.domain == null ? '' : ' · ${b.domain}'}${b.isPublished ? ' · Published' : ''}',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                b.title?.isNotEmpty == true
+                    ? b.title!
+                    : b.contentText ?? b.contentUrl ?? 'Saved excerpt',
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              if (b.summary?.isNotEmpty == true)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    b.summary!,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                children: [
+                  TextButton.icon(
+                    onPressed: () => context.push('/saved/${b.id}'),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: Text(
+                      b.summary?.isNotEmpty == true
+                          ? 'Edit thought'
+                          : 'Add thought',
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () async {
+                      await SaveActions.includeThisWeek(ref, b.id);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Included in this week’s draft'),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.playlist_add, size: 18),
+                    label: const Text('This week'),
+                  ),
+                ],
               ),
             ],
           ),
         ),
       ),
-    );
+    ),
+  );
+  Future<void> archive(BookmarksTableData b) async {
+    await ref.read(bookmarkRepositoryProvider).archive(b.id, !b.archived);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(b.archived ? 'Restored' : 'Archived'),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed:
+                () => ref
+                    .read(bookmarkRepositoryProvider)
+                    .archive(b.id, b.archived),
+          ),
+        ),
+      );
+    }
   }
 }
+
+String typeLabel(String type) => switch (type) {
+  'hnArticle' => 'HN article',
+  'hnComment' => 'HN comment',
+  'tweet' => 'Post',
+  'video' => 'Video',
+  _ => 'Web',
+};

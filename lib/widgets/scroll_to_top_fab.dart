@@ -3,10 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 
 class ScrollToTopFab extends StatefulWidget {
-  const ScrollToTopFab({
-    super.key,
-    required this.scrollController,
-  });
+  const ScrollToTopFab({super.key, required this.scrollController});
 
   final ScrollController scrollController;
 
@@ -22,10 +19,7 @@ class _ScrollToTopFabState extends State<ScrollToTopFab> {
   Widget build(BuildContext context) {
     if (!_initialized) {
       final size = MediaQuery.of(context).size;
-      _position = Offset(
-        size.width / 2 - 28,
-        size.height - 160,
-      );
+      _position = Offset(size.width / 2 - 28, size.height - 160);
       _initialized = true;
     }
 

@@ -41,8 +41,9 @@ class _LoginDialogState extends ConsumerState<LoginDialog> {
       _error = null;
     });
 
-    final success =
-        await ref.read(authNotifierProvider.notifier).login(username, password);
+    final success = await ref
+        .read(authNotifierProvider.notifier)
+        .login(username, password);
 
     if (mounted) {
       if (success) {
@@ -99,16 +100,17 @@ class _LoginDialogState extends ConsumerState<LoginDialog> {
         ),
         TextButton(
           onPressed: _isLoading ? null : _login,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.primary,
-                  ),
-                )
-              : const Text('LOGIN'),
+          child:
+              _isLoading
+                  ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  )
+                  : const Text('LOGIN'),
         ),
       ],
     );

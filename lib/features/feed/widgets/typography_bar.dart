@@ -80,7 +80,10 @@ class _TypographyBarState extends State<TypographyBar> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
-          const Text('Font Size:', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+          const Text(
+            'Font Size:',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
           const SizedBox(width: 4),
           _iconButton(Icons.text_decrease, () {
             setState(() {
@@ -95,17 +98,26 @@ class _TypographyBarState extends State<TypographyBar> {
             });
           }),
           const SizedBox(width: 8),
-          const Text('Line Height:', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+          const Text(
+            'Line Height:',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
           const SizedBox(width: 4),
           _iconButton(Icons.density_small, () {
             setState(() {
-              _settings.lineHeight = (_settings.lineHeight - 0.1).clamp(1.0, 2.0);
+              _settings.lineHeight = (_settings.lineHeight - 0.1).clamp(
+                1.0,
+                2.0,
+              );
               _update();
             });
           }),
           _iconButton(Icons.density_large, () {
             setState(() {
-              _settings.lineHeight = (_settings.lineHeight + 0.1).clamp(1.0, 2.0);
+              _settings.lineHeight = (_settings.lineHeight + 0.1).clamp(
+                1.0,
+                2.0,
+              );
               _update();
             });
           }),
@@ -116,9 +128,10 @@ class _TypographyBarState extends State<TypographyBar> {
             style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
             underline: const SizedBox.shrink(),
             isDense: true,
-            items: _fontFamilies
-                .map((f) => DropdownMenuItem(value: f, child: Text(f)))
-                .toList(),
+            items:
+                _fontFamilies
+                    .map((f) => DropdownMenuItem(value: f, child: Text(f)))
+                    .toList(),
             onChanged: (v) {
               if (v != null) {
                 setState(() {

@@ -93,9 +93,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             dropdownColor: AppColors.surfaceElevated,
             style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
             underline: const SizedBox.shrink(),
-            items: SearchTimeRange.values
-                .map((r) => DropdownMenuItem(value: r, child: Text(r.label)))
-                .toList(),
+            items:
+                SearchTimeRange.values
+                    .map(
+                      (r) => DropdownMenuItem(value: r, child: Text(r.label)),
+                    )
+                    .toList(),
             onChanged: (v) {
               if (v != null) {
                 ref.read(searchNotifierProvider.notifier).setTimeRange(v);
@@ -108,9 +111,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             dropdownColor: AppColors.surfaceElevated,
             style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
             underline: const SizedBox.shrink(),
-            items: SearchSortOrder.values
-                .map((s) => DropdownMenuItem(value: s, child: Text(s.label)))
-                .toList(),
+            items:
+                SearchSortOrder.values
+                    .map(
+                      (s) => DropdownMenuItem(value: s, child: Text(s.label)),
+                    )
+                    .toList(),
             onChanged: (v) {
               if (v != null) {
                 ref.read(searchNotifierProvider.notifier).setSortOrder(v);
@@ -172,8 +178,10 @@ class _SearchResultCard extends StatelessWidget {
     return InkWell(
       onTap: () async {
         if (hit.url != null && hit.url!.isNotEmpty) {
-          await launchUrl(Uri.parse(hit.url!),
-              mode: LaunchMode.externalApplication);
+          await launchUrl(
+            Uri.parse(hit.url!),
+            mode: LaunchMode.externalApplication,
+          );
         }
       },
       child: Padding(
@@ -236,13 +244,18 @@ class _SearchResultCard extends StatelessWidget {
                 padding: const EdgeInsets.all(8),
                 child: Column(
                   children: [
-                    const Icon(Icons.chat_bubble_outline,
-                        size: 20, color: AppColors.textSecondary),
+                    const Icon(
+                      Icons.chat_bubble_outline,
+                      size: 20,
+                      color: AppColors.textSecondary,
+                    ),
                     const SizedBox(height: 2),
                     Text(
                       '${hit.numComments}',
                       style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary),
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),

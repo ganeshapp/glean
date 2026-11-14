@@ -36,7 +36,8 @@ class _CommentTileState extends State<CommentTile> {
   }
 
   Color _depthColor(int depth) {
-    return AppColors.commentDepthColors[depth % AppColors.commentDepthColors.length];
+    return AppColors.commentDepthColors[depth %
+        AppColors.commentDepthColors.length];
   }
 
   @override
@@ -50,16 +51,15 @@ class _CommentTileState extends State<CommentTile> {
       onLongPress: widget.onLongPress,
       child: Container(
         decoration: BoxDecoration(
-          color: widget.isBookmarked
-              ? AppColors.primary.withValues(alpha: 0.06)
-              : null,
+          color:
+              widget.isBookmarked
+                  ? AppColors.primary.withValues(alpha: 0.06)
+                  : null,
           border: Border(
-            left: node.depth > 0
-                ? BorderSide(
-                    color: _depthColor(node.depth - 1),
-                    width: 3,
-                  )
-                : BorderSide.none,
+            left:
+                node.depth > 0
+                    ? BorderSide(color: _depthColor(node.depth - 1), width: 3)
+                    : BorderSide.none,
           ),
         ),
         margin: EdgeInsets.only(left: node.depth * 12.0),
@@ -96,8 +96,10 @@ class _CommentTileState extends State<CommentTile> {
                 if (node.isCollapsed) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.surfaceElevated,
                       borderRadius: BorderRadius.circular(4),
@@ -151,17 +153,18 @@ class _CommentTileState extends State<CommentTile> {
       }
       final href = _decodeEntities(match.group(1)!);
       final linkText = _stripHtml(match.group(2)!);
-      final recognizer = TapGestureRecognizer()
-        ..onTap = () => _openUrl(href);
+      final recognizer = TapGestureRecognizer()..onTap = () => _openUrl(href);
       _recognizers.add(recognizer);
-      spans.add(TextSpan(
-        text: linkText.isEmpty ? href : linkText,
-        style: const TextStyle(
-          color: AppColors.primary,
-          decoration: TextDecoration.underline,
+      spans.add(
+        TextSpan(
+          text: linkText.isEmpty ? href : linkText,
+          style: const TextStyle(
+            color: AppColors.primary,
+            decoration: TextDecoration.underline,
+          ),
+          recognizer: recognizer,
         ),
-        recognizer: recognizer,
-      ));
+      );
       last = match.end;
     }
     if (last < html.length) {

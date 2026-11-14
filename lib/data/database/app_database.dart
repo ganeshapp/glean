@@ -21,21 +21,91 @@ class BookmarksTable extends Table {
   BoolColumn get isPublished => boolean().withDefault(const Constant(false))();
   TextColumn get publishedWeek => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  BoolColumn get archived => boolean().withDefault(const Constant(false))();
+  TextColumn get canonicalKey => text().nullable()();
 }
 
-@DriftDatabase(tables: [BookmarksTable])
+@DataClassName('RoundupIssue')
+class RoundupIssues extends Table {
+  TextColumn get id => text()();
+  TextColumn get title => text()();
+  TextColumn get introduction => text().withDefault(const Constant(''))();
+  DateTimeColumn get date => dateTime()();
+  IntColumn get revision => integer().withDefault(const Constant(0))();
+  IntColumn get publishedRevision => integer().nullable()();
+  DateTimeColumn get publishedAt => dateTime().nullable()();
+  TextColumn get repository => text().nullable()();
+  TextColumn get filePath => text().nullable()();
+  TextColumn get branch => text().nullable()();
+  TextColumn get remoteSha => text().nullable()();
+  TextColumn get publicUrl => text().nullable()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('RoundupCard')
+class RoundupCards extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get issueId => text().references(RoundupIssues, #id)();
+  IntColumn get bookmarkId => integer().nullable()();
+  IntColumn get position => integer()();
+  TextColumn get type => text()();
+  TextColumn get title => text().withDefault(const Constant(''))();
+  TextColumn get url => text().withDefault(const Constant(''))();
+  TextColumn get discussionUrl => text().withDefault(const Constant(''))();
+  TextColumn get excerpt => text().withDefault(const Constant(''))();
+  TextColumn get author => text().withDefault(const Constant(''))();
+  TextColumn get blurb => text().withDefault(const Constant(''))();
+}
+
+@DataClassName('CommentExport')
+class CommentExports extends Table {
+  TextColumn get id => text()();
+  IntColumn get storyId => integer()();
+  TextColumn get title => text()();
+  IntColumn get depth => integer().withDefault(const Constant(3))();
+  IntColumn get rootLimit => integer().withDefault(const Constant(30))();
+  TextColumn get status => text().withDefault(const Constant('queued'))();
+  TextColumn get error => text().nullable()();
+  TextColumn get jsonContent => text().nullable()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DriftDatabase(
+  tables: [BookmarksTable, RoundupIssues, RoundupCards, CommentExports],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
+  AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.addColumn(bookmarksTable, bookmarksTable.archived);
+        await m.addColumn(bookmarksTable, bookmarksTable.canonicalKey);
+        await m.createTable(roundupIssues);
+        await m.createTable(roundupCards);
+        await m.createTable(commentExports);
+      }
+    },
+    beforeOpen: (_) async {
+      await customStatement('PRAGMA foreign_keys = ON');
+      await customStatement('PRAGMA busy_timeout = 5000');
+    },
+  );
 
   // Bookmarks DAO methods
 
   Future<List<BookmarksTableData>> getAllBookmarks() {
     return (select(bookmarksTable)
-          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-        .get();
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).get();
   }
 
   Future<List<BookmarksTableData>> getUnpublishedBookmarks() {
@@ -57,9 +127,8 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<bool> updateBookmark(BookmarksTableCompanion entry, int id) {
-    return (update(bookmarksTable)..where((t) => t.id.equals(id)))
-        .write(entry)
-        .then((rows) => rows > 0);
+    return (update(bookmarksTable)
+      ..where((t) => t.id.equals(id))).write(entry).then((rows) => rows > 0);
   }
 
   Future<int> deleteBookmark(int id) {
@@ -80,23 +149,22 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<bool> isBookmarked(int hnItemId) async {
-    final result = await (select(bookmarksTable)
-          ..where((t) => t.hnItemId.equals(hnItemId))
-          ..limit(1))
-        .get();
+    final result =
+        await (select(bookmarksTable)
+              ..where((t) => t.hnItemId.equals(hnItemId))
+              ..limit(1))
+            .get();
     return result.isNotEmpty;
   }
 
   Future<int> deleteByHnItemId(int hnItemId) {
     return (delete(bookmarksTable)
-          ..where((t) => t.hnItemId.equals(hnItemId)))
-        .go();
+      ..where((t) => t.hnItemId.equals(hnItemId))).go();
   }
 
   Stream<List<BookmarksTableData>> watchAllBookmarks() {
     return (select(bookmarksTable)
-          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-        .watch();
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
   }
 
   Stream<List<BookmarksTableData>> watchUnpublishedBookmarks() {

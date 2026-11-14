@@ -1,105 +1,79 @@
+import 'dart:convert';
 import '../../data/database/app_database.dart';
+import 'content_utils.dart';
 
 class MarkdownGenerator {
   MarkdownGenerator._();
-
-  static const _newTab = '{:target="_blank"}';
-
-  static String generateFrontmatter(String weekLabel, DateTime publishDate) {
-    final dateStr =
-        '${publishDate.year}-${publishDate.month.toString().padLeft(2, '0')}-${publishDate.day.toString().padLeft(2, '0')}';
-    return '---\n'
-        'title: "$weekLabel"\n'
-        'date: $dateStr\n'
-        'layout: single\n'
-        'collection: weekly\n'
-        'tags: [roundup]\n'
-        '---\n';
+  // Editors contain plain text. Escape source material before Markdown/Liquid rendering.
+  static String text(String value) => value
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAllMapped(RegExp(r'[\\`*_\[\]#]'), (m) => '\\${m[0]}');
+  static String _link(String label, String url) {
+    final safe = safeWebUrl(url);
+    return safe == null
+        ? text(label)
+        : '[${text(label)}](<${safe.replaceAll('>', '%3E').replaceAll('<', '%3C')}>)';
   }
 
-  static String generate(String weekLabel, List<BookmarksTableData> bookmarks) {
-    final buf = StringBuffer();
-
-    final articles =
-        bookmarks.where((b) => b.type == 'hnArticle').toList();
-    final quotes =
-        bookmarks.where((b) => b.type == 'hnComment').toList();
-    final tweets = bookmarks.where((b) => b.type == 'tweet').toList();
-    final webSnippets =
-        bookmarks.where((b) => b.type == 'website').toList();
-
-    if (articles.isNotEmpty) {
-      buf.writeln('## Articles\n');
-      for (final a in articles) {
-        final title = a.title ?? 'Untitled';
-        final url = a.contentUrl ?? '#';
-        final link = '[$title]($url)$_newTab';
-        if (a.hnUrl != null) {
-          buf.writeln(
-              '$link [<i class="fab fa-fw fa-hacker-news"></i>](${a.hnUrl})$_newTab');
-        } else {
-          buf.writeln(link);
-        }
-        if (a.summary != null && a.summary!.isNotEmpty) {
-          buf.writeln(a.summary!);
-        }
-        buf.writeln();
-      }
+  static String body(RoundupIssue issue, List<RoundupCard> cards) {
+    final out = <String>[];
+    if (issue.introduction.trim().isNotEmpty) {
+      out.add(text(issue.introduction.trim()));
     }
-
-    if (quotes.isNotEmpty) {
-      buf.writeln('## Quotes\n');
-      for (final c in quotes) {
-        final text = c.contentText ?? '';
-        if (text.isNotEmpty) {
-          buf.writeln(text);
+    // Preserve the caller's editorial order, including mixed sources.
+    for (final card in cards) {
+      final quote = card.type == 'hnComment' || card.type == 'tweet';
+      if (quote) {
+        if (card.excerpt.isNotEmpty) {
+          out.add(
+            card.excerpt
+                .split('\n')
+                .map((line) => '> ${text(line)}')
+                .join('\n'),
+          );
         }
-        final author = c.author ?? 'unknown';
-        final url = c.contentUrl ?? '#';
-        buf.writeln('-- [$author]($url)$_newTab');
-        if (c.summary != null && c.summary!.isNotEmpty) {
-          buf.writeln(c.summary!);
+        out.add(
+          '— ${_link(card.author.isNotEmpty ? card.author : 'Source', card.url)}',
+        );
+      } else {
+        out.add(
+          '### ${_link(card.title.isNotEmpty ? card.title : 'Saved link', card.url)}',
+        );
+        if (card.excerpt.isNotEmpty) {
+          out.add(
+            card.excerpt
+                .split('\n')
+                .map((line) => '> ${text(line)}')
+                .join('\n'),
+          );
         }
-        buf.writeln();
       }
-    }
-
-    if (tweets.isNotEmpty) {
-      buf.writeln('## Tweets\n');
-      for (final t in tweets) {
-        final text = t.contentText ?? '';
-        final author = t.author ?? '@unknown';
-        final url = t.contentUrl ?? '#';
-        if (text.isNotEmpty) {
-          buf.writeln('$text - [$author]($url)$_newTab');
-        } else {
-          buf.writeln('[$author]($url)$_newTab');
-        }
-        if (t.summary != null && t.summary!.isNotEmpty) {
-          buf.writeln(t.summary!);
-        }
-        buf.writeln();
+      if (card.blurb.trim().isNotEmpty) out.add(text(card.blurb.trim()));
+      if (card.discussionUrl.isNotEmpty && card.discussionUrl != card.url) {
+        out.add(_link('HN discussion', card.discussionUrl));
       }
+      out.add('<!-- roundup-item:${card.id} -->');
     }
+    return out.join('\n\n');
+  }
 
-    if (webSnippets.isNotEmpty) {
-      buf.writeln('## Web\n');
-      for (final w in webSnippets) {
-        final text = w.contentText ?? '';
-        final title = w.title ?? w.domain ?? 'Source';
-        final url = w.contentUrl ?? '#';
-        if (text.isNotEmpty) {
-          buf.writeln('$text - [$title]($url)$_newTab');
-        } else {
-          buf.writeln('[$title]($url)$_newTab');
-        }
-        if (w.summary != null && w.summary!.isNotEmpty) {
-          buf.writeln(w.summary!);
-        }
-        buf.writeln();
-      }
-    }
-
-    return buf.toString().trimRight();
+  static String document(RoundupIssue issue, List<RoundupCard> cards) {
+    final date =
+        '${issue.date.year}-${issue.date.month.toString().padLeft(2, '0')}-${issue.date.day.toString().padLeft(2, '0')}';
+    // Entity-encode braces so untrusted captured text cannot invoke Liquid tags.
+    final markdown = body(
+      issue,
+      cards,
+    ).replaceAll('{', '&#123;').replaceAll('}', '&#125;');
+    return '---\n'
+        'title: ${jsonEncode(issue.title)}\n'
+        'date: $date\n'
+        'layout: roundup\n'
+        'glean_issue: ${jsonEncode(issue.id)}\n'
+        'glean_revision: ${issue.revision}\n'
+        'permalink: /roundup/${issue.id}/\n'
+        '---\n\n$markdown\n';
   }
 }

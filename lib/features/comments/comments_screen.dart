@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../core/utils/content_utils.dart';
+import '../capture/save_actions.dart';
+import '../exports/exports_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -46,14 +50,56 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
 
   void _onCommentAction(CommentAction action, CommentNode node) {
     switch (action) {
+      case CommentAction.copyText:
+        Clipboard.setData(
+          ClipboardData(text: plainText(node.comment.text ?? '')),
+        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Comment copied')));
+      case CommentAction.selectText:
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          builder:
+              (ctx) => SafeArea(
+                child: SizedBox(
+                  height: MediaQuery.of(ctx).size.height * .75,
+                  child: Column(
+                    children: [
+                      ListTile(
+                        title: const Text('Select and copy'),
+                        subtitle: const Text(
+                          'Long press the text to select just the lines you want.',
+                        ),
+                        trailing: IconButton(
+                          tooltip: 'Close',
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(20),
+                          child: SelectableText(
+                            plainText(node.comment.text ?? ''),
+                            style: const TextStyle(fontSize: 16, height: 1.5),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+        );
       case CommentAction.upvote:
         _requireAuth(() async {
           final repo = ref.read(authRepositoryProvider);
           final ok = await repo.upvote(node.comment.id);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(ok ? 'Upvoted' : 'Failed to upvote'),
-            ));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(ok ? 'Upvoted' : 'Failed to upvote')),
+            );
           }
         });
       case CommentAction.downvote:
@@ -61,9 +107,9 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
           final repo = ref.read(authRepositoryProvider);
           final ok = await repo.downvote(node.comment.id);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(ok ? 'Downvoted' : 'Failed to downvote'),
-            ));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(ok ? 'Downvoted' : 'Failed to downvote')),
+            );
           }
         });
       case CommentAction.reply:
@@ -92,26 +138,27 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Reply'),
-        content: TextField(
-          controller: controller,
-          maxLines: 5,
-          decoration: const InputDecoration(
-            hintText: 'Write your reply...',
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Reply'),
+            content: TextField(
+              controller: controller,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                hintText: 'Write your reply...',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('CANCEL'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, controller.text),
+                child: const Text('SEND'),
+              ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCEL'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('SEND'),
-          ),
-        ],
-      ),
     );
     controller.dispose();
 
@@ -119,98 +166,37 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
       final repo = ref.read(authRepositoryProvider);
       final ok = await repo.reply(parentId, result.trim());
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(ok ? 'Reply sent' : 'Failed to send reply'),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ok ? 'Reply sent' : 'Failed to send reply')),
+        );
         if (ok) {
-          ref
-              .read(commentsNotifierProvider(widget.storyId).notifier)
-              .load();
+          ref.read(commentsNotifierProvider(widget.storyId).notifier).load();
         }
       }
     }
   }
 
   Future<void> _toggleArticleBookmark() async {
-    final repo = ref.read(bookmarkRepositoryProvider);
-    final isAlready = ref.read(isItemBookmarkedProvider(widget.storyId));
-
-    if (isAlready) {
-      await repo.deleteByHnItemId(widget.storyId);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bookmark removed')),
-        );
-      }
-      return;
-    }
-
-    final state = ref.read(commentsNotifierProvider(widget.storyId));
-    final story = state.story;
-    if (story == null) return;
-
-    final bookmark = Bookmark(
-      type: BookmarkType.hnArticle,
-      title: story.title,
-      contentUrl: story.url,
-      hnUrl: HnConstants.itemUrl(story.id),
-      hnItemId: story.id,
-      domain: story.domain,
-    );
-
-    await repo.addBookmark(bookmark);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Article bookmarked')),
-      );
-    }
+    final story = ref.read(commentsNotifierProvider(widget.storyId)).story;
+    if (story != null) await SaveActions.story(context, ref, story);
   }
 
   void _toggleCommentBookmark(CommentNode node) async {
-    final repo = ref.read(bookmarkRepositoryProvider);
-    final isAlready = ref.read(isItemBookmarkedProvider(node.comment.id));
-
-    if (isAlready) {
-      await repo.deleteByHnItemId(node.comment.id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bookmark removed')),
-        );
-      }
-      return;
-    }
-
-    final stripped = _stripHtml(node.comment.text ?? '');
-    final bookmark = Bookmark(
-      type: BookmarkType.hnComment,
-      contentText: stripped,
-      contentUrl: HnConstants.itemUrl(node.comment.id),
-      hnItemId: node.comment.id,
-      hnUrl: HnConstants.itemUrl(widget.storyId),
-      author: node.comment.by,
+    await SaveActions.save(
+      context,
+      ref,
+      Bookmark(
+        type: BookmarkType.hnComment,
+        contentText: plainText(node.comment.text ?? ''),
+        contentUrl: HnConstants.itemUrl(node.comment.id),
+        hnItemId: node.comment.id,
+        hnUrl: HnConstants.itemUrl(widget.storyId),
+        author: node.comment.by,
+      ),
     );
-
-    await repo.addBookmark(bookmark);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Comment bookmarked')),
-      );
-    }
   }
 
-  String _stripHtml(String html) {
-    return html
-        .replaceAll(RegExp(r'<p>'), '\n\n')
-        .replaceAll(RegExp(r'<br\s*/?>'), '\n')
-        .replaceAll(RegExp(r'<[^>]+>'), '')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&amp;', '&')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#x27;', "'")
-        .replaceAll('&#x2F;', '/')
-        .trim();
-  }
+  String _stripHtml(String html) => plainText(html);
 
   Future<void> _openUrl(String url) async {
     await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
@@ -218,18 +204,24 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
 
   void _handleOverflowAction(String value) {
     switch (value) {
+      case 'export':
+        queueDiscussionExport(
+          context,
+          ref,
+          widget.storyId,
+          ref.read(commentsNotifierProvider(widget.storyId)).story?.title ??
+              'HN discussion',
+        );
       case 'refresh':
-        ref
-            .read(commentsNotifierProvider(widget.storyId).notifier)
-            .load();
+        ref.read(commentsNotifierProvider(widget.storyId).notifier).load();
       case 'upvote':
         _requireAuth(() async {
           final repo = ref.read(authRepositoryProvider);
           final ok = await repo.upvote(widget.storyId);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(ok ? 'Upvoted' : 'Failed to upvote'),
-            ));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(ok ? 'Upvoted' : 'Failed to upvote')),
+            );
           }
         });
       case 'reply':
@@ -258,8 +250,7 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
             actions: [
               IconButton(
                 icon: const Icon(Icons.open_in_browser),
-                onPressed: () =>
-                    _openUrl(HnConstants.itemUrl(widget.storyId)),
+                onPressed: () => _openUrl(HnConstants.itemUrl(widget.storyId)),
               ),
               IconButton(
                 icon: Icon(
@@ -269,14 +260,21 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
               ),
               PopupMenuButton<String>(
                 onSelected: _handleOverflowAction,
-                itemBuilder: (context) => const [
-                  PopupMenuItem(value: 'refresh', child: Text('Refresh')),
-                  PopupMenuItem(value: 'upvote', child: Text('Upvote')),
-                  PopupMenuItem(value: 'reply', child: Text('Reply')),
-                  PopupMenuItem(value: 'share', child: Text('Share link')),
-                  PopupMenuItem(
-                      value: 'typography', child: Text('Typography')),
-                ],
+                itemBuilder:
+                    (context) => const [
+                      PopupMenuItem(
+                        value: 'export',
+                        child: Text('Export discussion for AI'),
+                      ),
+                      PopupMenuItem(value: 'refresh', child: Text('Refresh')),
+                      PopupMenuItem(value: 'upvote', child: Text('Upvote')),
+                      PopupMenuItem(value: 'reply', child: Text('Reply')),
+                      PopupMenuItem(value: 'share', child: Text('Share link')),
+                      PopupMenuItem(
+                        value: 'typography',
+                        child: Text('Typography'),
+                      ),
+                    ],
               ),
             ],
           ),
@@ -307,16 +305,25 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline,
-                  size: 48, color: AppColors.textSecondary),
+              const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(height: 16),
-              Text(state.error!,
-                  style: const TextStyle(color: AppColors.textSecondary)),
+              Text(
+                state.error!,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
               const SizedBox(height: 8),
               TextButton(
-                onPressed: () => ref
-                    .read(commentsNotifierProvider(widget.storyId).notifier)
-                    .load(),
+                onPressed:
+                    () =>
+                        ref
+                            .read(
+                              commentsNotifierProvider(widget.storyId).notifier,
+                            )
+                            .load(),
                 child: const Text('Retry'),
               ),
             ],
@@ -346,8 +353,7 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
           if (nodeIndex >= flatList.length) return const SizedBox.shrink();
           final node = flatList[nodeIndex];
           final bookmarkedIds = ref.watch(bookmarkedItemIdsProvider);
-          final isCommentBookmarked =
-              bookmarkedIds.contains(node.comment.id);
+          final isCommentBookmarked = bookmarkedIds.contains(node.comment.id);
           return CommentTile(
             node: node,
             isBookmarked: isCommentBookmarked,
@@ -359,16 +365,18 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
             onLongPress: () {
               showModalBottomSheet(
                 context: context,
-                builder: (_) => CommentActionsSheet(
-                  comment: node.comment,
-                  isBookmarked: isCommentBookmarked,
-                  onAction: (action) => _onCommentAction(action, node),
-                ),
+                builder:
+                    (_) => CommentActionsSheet(
+                      comment: node.comment,
+                      isBookmarked: isCommentBookmarked,
+                      onAction: (action) => _onCommentAction(action, node),
+                    ),
               );
             },
           );
         },
-        childCount: (state.story != null ? 1 : 0) +
+        childCount:
+            (state.story != null ? 1 : 0) +
             (state.isLoading && flatList.isEmpty ? 1 : flatList.length),
       ),
     );

@@ -34,19 +34,19 @@ class _BookmarkSummaryDialogState extends State<BookmarkSummaryDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Add Summary'),
+      title: const Text('Your thought'),
       content: TextField(
         controller: _controller,
         maxLines: 4,
         decoration: const InputDecoration(
-          hintText: 'Optional summary for this bookmark...',
+          hintText: 'Why did this catch your attention?',
         ),
         autofocus: true,
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context, ''),
-          child: const Text('SKIP'),
+          onPressed: () => Navigator.pop(context),
+          child: const Text('CANCEL'),
         ),
         TextButton(
           onPressed: () => Navigator.pop(context, _controller.text.trim()),

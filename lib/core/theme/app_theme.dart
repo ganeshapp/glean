@@ -24,9 +24,7 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
-      drawerTheme: const DrawerThemeData(
-        backgroundColor: AppColors.surface,
-      ),
+      drawerTheme: const DrawerThemeData(backgroundColor: AppColors.surface),
       dividerTheme: const DividerThemeData(
         color: AppColors.divider,
         thickness: 1,
@@ -73,7 +71,10 @@ class AppTheme {
         headlineLarge: TextStyle(color: AppColors.textPrimary),
         headlineMedium: TextStyle(color: AppColors.textPrimary),
         headlineSmall: TextStyle(color: AppColors.textPrimary),
-        titleLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+        titleLarge: TextStyle(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
         titleMedium: TextStyle(color: AppColors.textPrimary),
         titleSmall: TextStyle(color: AppColors.textPrimary),
         bodyLarge: TextStyle(color: AppColors.textPrimary),

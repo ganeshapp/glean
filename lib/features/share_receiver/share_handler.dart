@@ -1,395 +1,310 @@
 import 'dart:async';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:html/parser.dart' as html;
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
-
-import '../../core/theme/app_colors.dart';
+import '../../core/utils/content_utils.dart';
+import '../../data/database/app_database.dart';
 import '../../data/models/bookmark.dart';
+import '../../data/repositories/bookmark_repository.dart';
 import '../bookmarks/bookmark_provider.dart';
+import '../capture/save_actions.dart';
+
+class SharedCapture {
+  final String? url, text, author;
+  final BookmarkType type;
+  final int? hnId;
+  const SharedCapture({
+    this.url,
+    this.text,
+    this.author,
+    required this.type,
+    this.hnId,
+  });
+  static SharedCapture parse(String shared) {
+    final match = RegExp(r'https?://[^\s<>]+').firstMatch(shared);
+    final raw = match?.group(0)?.replaceAll(RegExp(r'[.,;!]+$'), '');
+    final url = safeWebUrl(raw);
+    final uri = Uri.tryParse(url ?? '');
+    final host =
+        uri?.host.toLowerCase().replaceFirst(RegExp(r'^www\.'), '') ?? '';
+    final text =
+        match == null
+            ? shared.trim()
+            : shared.replaceRange(match.start, match.end, '').trim();
+    final tweet = [
+      'twitter.com',
+      'x.com',
+      'mobile.twitter.com',
+      'mobile.x.com',
+    ].contains(host);
+    final video = ['youtube.com', 'm.youtube.com', 'youtu.be'].contains(host);
+    final author =
+        tweet &&
+                (uri?.pathSegments.length ?? 0) >= 3 &&
+                uri!.pathSegments[1] == 'status' &&
+                uri.pathSegments.first != 'i'
+            ? '@${uri.pathSegments.first}'
+            : null;
+    return SharedCapture(
+      url: url,
+      text: text.isEmpty ? null : text,
+      author: author,
+      hnId:
+          host == 'news.ycombinator.com'
+              ? int.tryParse(uri?.queryParameters['id'] ?? '')
+              : null,
+      type:
+          tweet
+              ? BookmarkType.tweet
+              : video
+              ? BookmarkType.video
+              : BookmarkType.website,
+    );
+  }
+}
 
 class ShareHandler {
   StreamSubscription? _subscription;
-  final WidgetRef _ref;
-  final BuildContext _context;
-  final Dio _dio = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 8),
-    receiveTimeout: const Duration(seconds: 8),
-  ));
-
-  ShareHandler(this._ref, this._context);
-
+  final WidgetRef ref;
+  final BuildContext context;
+  final Dio dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 8),
+      receiveTimeout: const Duration(seconds: 8),
+    ),
+  );
+  Future<void> queue = Future.value();
+  ShareHandler(this.ref, this.context);
   void init() {
-    ReceiveSharingIntent.instance.getInitialMedia().then((value) {
-      if (value.isNotEmpty) {
-        _handleShared(value.first);
+    ReceiveSharingIntent.instance.getInitialMedia().then((items) {
+      for (final item in items) {
+        enqueue(item.path);
       }
+      ReceiveSharingIntent.instance.reset();
     });
-
-    _subscription = ReceiveSharingIntent.instance
-        .getMediaStream()
-        .listen((List<SharedMediaFile> value) {
-      if (value.isNotEmpty) {
-        _handleShared(value.first);
+    _subscription = ReceiveSharingIntent.instance.getMediaStream().listen((
+      items,
+    ) {
+      for (final item in items) {
+        enqueue(item.path);
       }
     });
   }
 
   void dispose() {
     _subscription?.cancel();
+    dio.close();
   }
 
-  void _handleShared(SharedMediaFile media) async {
-    final text = media.path;
-    if (text.isEmpty) return;
-
-    var parsed = _parseSharedContent(text);
-
-    if (parsed.type == BookmarkType.tweet && parsed.url != null) {
-      final tweetData = await _fetchTweetOembed(parsed.url!);
-      if (tweetData != null) {
-        parsed = _ParsedShare(
-          type: BookmarkType.tweet,
-          text: parsed.text ?? tweetData['text'],
-          url: parsed.url,
-          author: parsed.author ?? tweetData['author'],
-          title: null,
+  void enqueue(String text) {
+    queue = queue.then((_) => capture(text)).catchError((Object _) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not save the shared item. Please share it again.',
+            ),
+          ),
         );
       }
-    } else if (parsed.type == BookmarkType.website && parsed.url != null) {
-      if (parsed.title == null || parsed.title!.isEmpty) {
-        final title = await _fetchPageTitle(parsed.url!);
-        if (title != null) {
-          parsed = _ParsedShare(
-            type: BookmarkType.website,
-            text: parsed.text,
-            url: parsed.url,
-            author: parsed.author,
-            title: title,
-          );
-        }
-      }
-    }
-
-    _showSaveSheet(parsed);
+    });
   }
 
-  _ParsedShare _parseSharedContent(String text) {
-    final urlRegex = RegExp(r'https?://\S+');
-    final match = urlRegex.firstMatch(text);
-    final url = match?.group(0);
-    final cleanText = text.replaceAll(urlRegex, '').trim();
-
-    if (url != null &&
-        (url.contains('twitter.com') ||
-            url.contains('x.com') ||
-            url.contains('nitter.'))) {
-      final authorMatch =
-          RegExp(r'(?:twitter\.com|x\.com)/(\w+)/status/').firstMatch(url);
-      String? author;
-      if (authorMatch != null && authorMatch.group(1) != 'i') {
-        author = '@${authorMatch.group(1)}';
-      }
-      return _ParsedShare(
-        type: BookmarkType.tweet,
-        text: cleanText.isNotEmpty ? cleanText : null,
-        url: url,
-        author: author,
-      );
-    }
-
-    return _ParsedShare(
-      type: BookmarkType.website,
-      text: cleanText.isNotEmpty ? cleanText : null,
-      url: url,
-    );
-  }
-
-  Future<Map<String, String>?> _fetchTweetOembed(String tweetUrl) async {
-    try {
-      final response = await _dio.get(
-        'https://publish.twitter.com/oembed',
-        queryParameters: {'url': tweetUrl, 'omit_script': 'true'},
-      );
-      if (response.statusCode == 200) {
-        final data = response.data as Map<String, dynamic>;
-        final authorUrl = data['author_url'] as String?;
-        final html = data['html'] as String?;
-
-        String? author;
-        if (authorUrl != null) {
-          final handleMatch =
-              RegExp(r'(?:twitter\.com|x\.com)/(\w+)').firstMatch(authorUrl);
-          if (handleMatch != null) {
-            author = '@${handleMatch.group(1)}';
-          }
-        }
-        author ??= data['author_name'] as String?;
-
-        String? tweetText;
-        if (html != null) {
-          final pMatch =
-              RegExp(r'<p[^>]*>(.*?)</p>', dotAll: true).firstMatch(html);
-          if (pMatch != null) {
-            tweetText = pMatch
-                .group(1)!
-                .replaceAll(RegExp(r'<[^>]+>'), '')
-                .replaceAll('&mdash;', '\u2014')
-                .replaceAll('&amp;', '&')
-                .replaceAll('&lt;', '<')
-                .replaceAll('&gt;', '>')
-                .replaceAll('&quot;', '"')
-                .replaceAll('&#39;', "'")
-                .trim();
-          }
-        }
-
-        final result = <String, String>{};
-        if (author != null) result['author'] = author;
-        if (tweetText != null && tweetText.isNotEmpty) {
-          result['text'] = tweetText;
-        }
-        return result.isNotEmpty ? result : null;
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  Future<String?> _fetchPageTitle(String url) async {
-    try {
-      final response = await _dio.get(
-        url,
-        options: Options(
-          headers: {
-            'User-Agent':
-                'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
-          },
-          responseType: ResponseType.plain,
-        ),
-      );
-      if (response.statusCode == 200) {
-        final body = response.data.toString();
-        final titleMatch =
-            RegExp(r'<title[^>]*>([^<]+)</title>', caseSensitive: false)
-                .firstMatch(body);
-        return titleMatch?.group(1)?.trim();
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  void _showSaveSheet(_ParsedShare parsed) {
-    if (!_context.mounted) return;
-    final summaryController = TextEditingController();
-    final titleController =
-        TextEditingController(text: parsed.title ?? '');
-    final urlController =
-        TextEditingController(text: parsed.url ?? '');
-    bool isFetchingTitle = false;
-
-    showModalBottomSheet(
-      context: _context,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          Future<void> fetchTitleFromUrl() async {
-            final url = urlController.text.trim();
-            if (url.isEmpty || !url.startsWith('http')) return;
-            setSheetState(() => isFetchingTitle = true);
-            final title = await _fetchPageTitle(url);
-            if (ctx.mounted) {
-              setSheetState(() => isFetchingTitle = false);
-              if (title != null && titleController.text.trim().isEmpty) {
-                titleController.text = title;
-              }
-            }
-          }
-
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom,
-              left: 16,
-              right: 16,
-              top: 16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      parsed.type == BookmarkType.tweet
-                          ? Icons.alternate_email
-                          : Icons.language,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      parsed.type == BookmarkType.tweet
-                          ? 'Save Tweet'
-                          : 'Save Web Snippet',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                if (parsed.type == BookmarkType.tweet &&
-                    parsed.author != null)
-                  Text(
-                    parsed.author!,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600),
-                  ),
-                if (parsed.text != null) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceElevated,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      parsed.text!,
-                      maxLines: 5,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 14, color: AppColors.textPrimary),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                if (parsed.type == BookmarkType.website) ...[
-                  TextField(
-                    controller: urlController,
-                    decoration: InputDecoration(
-                      labelText: 'URL',
-                      isDense: true,
-                      suffixIcon: isFetchingTitle
-                          ? const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2),
-                              ),
-                            )
-                          : IconButton(
-                              icon: const Icon(Icons.refresh, size: 20),
-                              onPressed: fetchTitleFromUrl,
-                              tooltip: 'Fetch page title',
-                            ),
-                    ),
-                    keyboardType: TextInputType.url,
-                    onSubmitted: (_) => fetchTitleFromUrl(),
-                  ),
-                  const SizedBox(height: 12),
-                ] else if (parsed.url != null) ...[
-                  Text(
-                    parsed.url!,
-                    style: const TextStyle(
-                        fontSize: 13, color: AppColors.textSecondary),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                TextField(
-                  controller: titleController,
-                  decoration: InputDecoration(
-                    labelText: parsed.type == BookmarkType.tweet
-                        ? 'Author handle (optional)'
-                        : 'Page title (optional)',
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: summaryController,
-                  decoration: const InputDecoration(
-                    labelText: 'Summary (optional)',
-                    isDense: true,
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () async {
-                      final authorOrTitle =
-                          titleController.text.trim().isNotEmpty
-                              ? titleController.text.trim()
-                              : null;
-                      final finalUrl =
-                          urlController.text.trim().isNotEmpty
-                              ? urlController.text.trim()
-                              : parsed.url;
-
-                      final bookmark = Bookmark(
-                        type: parsed.type,
-                        title: parsed.type == BookmarkType.website
-                            ? (authorOrTitle ?? parsed.title)
-                            : null,
-                        contentText: parsed.text,
-                        contentUrl: finalUrl,
-                        author: parsed.type == BookmarkType.tweet
-                            ? (authorOrTitle ?? parsed.author)
-                            : null,
-                        summary: summaryController.text.trim().isNotEmpty
-                            ? summaryController.text.trim()
-                            : null,
-                        domain: finalUrl != null
-                            ? Uri.tryParse(finalUrl)?.host
-                            : null,
-                      );
-                      await _ref
-                          .read(bookmarkRepositoryProvider)
-                          .addBookmark(bookmark);
-                      if (ctx.mounted) {
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(_context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Saved to bookmarks')),
-                        );
-                      }
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                    ),
-                    child: const Text('Save'),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          );
-        },
+  Future<void> capture(String text) async {
+    if (text.trim().isEmpty) return;
+    final capture = SharedCapture.parse(text);
+    final repo = ref.read(bookmarkRepositoryProvider);
+    final db = ref.read(appDatabaseProvider);
+    final before = await repo.getAll();
+    final id = await repo.addBookmark(
+      Bookmark(
+        type: capture.type,
+        contentUrl: capture.url,
+        contentText: capture.text,
+        author: capture.author,
+        hnItemId: capture.hnId,
+        hnUrl: capture.hnId == null ? null : capture.url,
+        domain: capture.url == null ? null : Uri.parse(capture.url!).host,
       ),
     );
+    final isNew = !before.any((b) => b.id == id);
+    // Persistence precedes all metadata requests and UI interactions.
+    unawaited(enrich(db, id, capture));
+    if (!context.mounted) return;
+    var acting = false;
+    await showModalBottomSheet(
+      context: context,
+      builder:
+          (sheetContext) => StatefulBuilder(
+            builder: (ctx, set) {
+              Future<void> finish({
+                Future<void> Function()? action,
+                VoidCallback? after,
+              }) async {
+                if (acting) return;
+                set(() => acting = true);
+                try {
+                  if (action != null) await action();
+                  if (ctx.mounted && ModalRoute.of(ctx)?.isCurrent == true) {
+                    Navigator.pop(ctx);
+                    after?.call();
+                  }
+                } catch (_) {
+                  if (ctx.mounted) {
+                    set(() => acting = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Could not finish. Please try again.'),
+                      ),
+                    );
+                  }
+                }
+              }
+
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        isNew ? 'Saved' : 'Already in your library',
+                        style: Theme.of(ctx).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        capture.url ?? capture.text ?? 'Saved excerpt',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        icon: const Icon(Icons.edit_outlined),
+                        label: const Text('Add a thought'),
+                        onPressed:
+                            acting
+                                ? null
+                                : () => finish(
+                                  after: () => context.push('/saved/$id'),
+                                ),
+                      ),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.playlist_add),
+                        label: const Text('Include this week'),
+                        onPressed:
+                            acting
+                                ? null
+                                : () => finish(
+                                  action: () async {
+                                    await SaveActions.includeThisWeek(ref, id);
+                                  },
+                                ),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          if (isNew)
+                            TextButton(
+                              onPressed:
+                                  acting
+                                      ? null
+                                      : () => finish(
+                                        action: () => repo.archive(id, true),
+                                      ),
+                              child: const Text('Undo save'),
+                            ),
+                          TextButton(
+                            onPressed: acting ? null : () => finish(),
+                            child: const Text('Done'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+    );
   }
-}
 
-class _ParsedShare {
-  final BookmarkType type;
-  final String? text;
-  final String? url;
-  final String? author;
-  final String? title;
-
-  _ParsedShare({
-    required this.type,
-    this.text,
-    this.url,
-    this.author,
-    this.title,
-  });
+  Future<void> enrich(AppDatabase db, int id, SharedCapture capture) async {
+    try {
+      String? title, excerpt, author;
+      String? type, hnUrl, sourceUrl;
+      if (capture.hnId != null) {
+        final response = await dio.get(
+          'https://hacker-news.firebaseio.com/v0/item/${capture.hnId}.json',
+        );
+        final item = response.data as Map?;
+        if (item == null || item['deleted'] == true || item['dead'] == true) {
+          return;
+        }
+        type = item['type'] == 'comment' ? 'hnComment' : 'hnArticle';
+        title = item['title'] as String?;
+        excerpt = item['text'] is String ? plainText(item['text']) : null;
+        author = item['by'] as String?;
+        sourceUrl = item['url'] as String? ?? capture.url;
+        hnUrl = capture.url;
+        if (type == 'hnComment') {
+          var parent = item['parent'] as int?;
+          for (var i = 0; i < 20 && parent != null; i++) {
+            final next =
+                (await dio.get(
+                      'https://hacker-news.firebaseio.com/v0/item/$parent.json',
+                    )).data
+                    as Map?;
+            if (next == null) break;
+            if (next['type'] != 'comment') {
+              hnUrl = 'https://news.ycombinator.com/item?id=$parent';
+              break;
+            }
+            parent = next['parent'] as int?;
+          }
+        }
+      } else if (capture.url != null && capture.type == BookmarkType.tweet) {
+        final response = await dio.get(
+          'https://publish.twitter.com/oembed',
+          queryParameters: {'url': capture.url, 'omit_script': true},
+        );
+        final data = response.data as Map;
+        excerpt =
+            html
+                .parseFragment(data['html'] as String? ?? '')
+                .querySelector('p')
+                ?.text;
+        author = capture.author ?? data['author_name'] as String?;
+      } else if (capture.url != null && capture.type == BookmarkType.video) {
+        final response = await dio.get(
+          'https://www.youtube.com/oembed',
+          queryParameters: {'url': capture.url, 'format': 'json'},
+        );
+        title = response.data['title'] as String?;
+        author = response.data['author_name'] as String?;
+      } else if (capture.url != null) {
+        final response = await dio.get<String>(
+          capture.url!,
+          options: Options(responseType: ResponseType.plain),
+        );
+        title =
+            html.parse(response.data ?? '').querySelector('title')?.text.trim();
+      }
+      await BookmarkRepository(db).enrich(
+        id,
+        capturedUrl: capture.url,
+        title: title,
+        excerpt: excerpt,
+        author: author,
+        type: type,
+        discussionUrl: hnUrl,
+        sourceUrl: sourceUrl,
+      );
+    } catch (_) {
+      /* The saved URL/text remains usable offline or when metadata is unavailable. */
+    }
+  }
 }

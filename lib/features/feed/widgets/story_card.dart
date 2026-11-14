@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../capture/save_actions.dart';
+import '../../bookmarks/bookmark_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -6,7 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../data/models/hn_story.dart';
 
-class StoryCard extends StatelessWidget {
+class StoryCard extends ConsumerWidget {
   const StoryCard({
     super.key,
     required this.story,
@@ -31,7 +34,7 @@ class StoryCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
       onTap: _openArticle,
       child: Padding(
@@ -50,9 +53,10 @@ class StoryCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: fontSize,
                       fontWeight: FontWeight.w500,
-                      color: isRead
-                          ? AppColors.textSecondary
-                          : AppColors.textPrimary,
+                      color:
+                          isRead
+                              ? AppColors.textSecondary
+                              : AppColors.textPrimary,
                       height: lineHeight,
                     ),
                   ),
@@ -70,7 +74,20 @@ class StoryCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            _buildCommentButton(context),
+            Column(
+              children: [
+                IconButton(
+                  tooltip: 'Save article',
+                  icon: Icon(
+                    ref.watch(isItemBookmarkedProvider(story.id))
+                        ? Icons.bookmark
+                        : Icons.bookmark_border,
+                  ),
+                  onPressed: () => SaveActions.story(context, ref, story),
+                ),
+                _buildCommentButton(context),
+              ],
+            ),
           ],
         ),
       ),
@@ -91,10 +108,7 @@ class StoryCard extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           AppDateUtils.timeAgo(story.dateTime),
-          style: const TextStyle(
-            fontSize: 13,
-            color: AppColors.textSecondary,
-          ),
+          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
         ),
       ],
     );

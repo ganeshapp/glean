@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../auth/auth_provider.dart';
-import '../share_receiver/share_handler.dart';
 import 'feed_provider.dart';
 import 'read_state_provider.dart';
 import 'widgets/feed_category_drawer.dart';
@@ -32,7 +31,6 @@ class FeedScreen extends ConsumerStatefulWidget {
 class _FeedScreenState extends ConsumerState<FeedScreen> {
   FeedCategory _category = FeedCategory.top;
   final ScrollController _scrollController = ScrollController();
-  ShareHandler? _shareHandler;
   bool _showTypography = false;
 
   Offset? _fabPosition;
@@ -45,14 +43,11 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(feedNotifierProvider.notifier).loadCategory(_category);
       ref.read(authNotifierProvider.notifier).checkAuth();
-      _shareHandler = ShareHandler(ref, context);
-      _shareHandler!.init();
     });
   }
 
   @override
   void dispose() {
-    _shareHandler?.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -86,8 +81,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
             builder: (context, typo, _) {
               return RefreshIndicator(
                 color: AppColors.primary,
-                onRefresh: () =>
-                    ref.read(feedNotifierProvider.notifier).refresh(),
+                onRefresh:
+                    () => ref.read(feedNotifierProvider.notifier).refresh(),
                 child: CustomScrollView(
                   controller: _scrollController,
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -103,21 +98,25 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.refresh),
-                          onPressed: () =>
-                              ref.read(feedNotifierProvider.notifier).refresh(),
+                          onPressed:
+                              () =>
+                                  ref
+                                      .read(feedNotifierProvider.notifier)
+                                      .refresh(),
                         ),
                         IconButton(
                           icon: const Icon(Icons.text_fields),
-                          onPressed: () =>
-                              setState(() => _showTypography = !_showTypography),
+                          onPressed:
+                              () => setState(
+                                () => _showTypography = !_showTypography,
+                              ),
                         ),
                       ],
                     ),
                     if (_showTypography)
                       SliverToBoxAdapter(
                         child: TypographyBar(
-                          onDone: () =>
-                              setState(() => _showTypography = false),
+                          onDone: () => setState(() => _showTypography = false),
                         ),
                       ),
                     _buildSliverContent(feedState, typo),
@@ -143,10 +142,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
         onPanUpdate: (details) {
           setState(() {
             _fabPosition = Offset(
-              (_fabPosition!.dx + details.delta.dx)
-                  .clamp(0, size.width - 56),
-              (_fabPosition!.dy + details.delta.dy)
-                  .clamp(0, size.height - 56),
+              (_fabPosition!.dx + details.delta.dx).clamp(0, size.width - 56),
+              (_fabPosition!.dy + details.delta.dy).clamp(0, size.height - 56),
             );
           });
         },
@@ -162,8 +159,11 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
             }
           },
           backgroundColor: AppColors.primary,
-          child: const Icon(Icons.keyboard_arrow_down,
-              color: Colors.white, size: 24),
+          child: const Icon(
+            Icons.keyboard_arrow_down,
+            color: Colors.white,
+            size: 24,
+          ),
         ),
       ),
     );
@@ -176,8 +176,11 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline,
-                  size: 48, color: AppColors.textSecondary),
+              const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(height: 16),
               const Text(
                 'Failed to load stories',
@@ -185,8 +188,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               ),
               const SizedBox(height: 8),
               TextButton(
-                onPressed: () =>
-                    ref.read(feedNotifierProvider.notifier).refresh(),
+                onPressed:
+                    () => ref.read(feedNotifierProvider.notifier).refresh(),
                 child: const Text('Retry'),
               ),
             ],
@@ -227,8 +230,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
           fontSize: typo.fontSize,
           lineHeight: typo.lineHeight,
           isRead: readIds.contains(story.id),
-          onRead: () =>
-              ref.read(readStateProvider.notifier).markRead(story.id),
+          onRead: () => ref.read(readStateProvider.notifier).markRead(story.id),
         );
       },
     );

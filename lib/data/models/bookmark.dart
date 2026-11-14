@@ -1,9 +1,4 @@
-enum BookmarkType {
-  hnArticle,
-  hnComment,
-  tweet,
-  website,
-}
+enum BookmarkType { hnArticle, hnComment, tweet, website, video }
 
 class Bookmark {
   final int? id;

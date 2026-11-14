@@ -11,8 +11,10 @@ final storyRepositoryProvider = Provider<StoryRepository>((ref) {
   return StoryRepository(api: ref.watch(hnApiServiceProvider));
 });
 
-final storyIdsProvider =
-    FutureProvider.family<List<int>, FeedCategory>((ref, category) {
+final storyIdsProvider = FutureProvider.family<List<int>, FeedCategory>((
+  ref,
+  category,
+) {
   return ref.watch(storyRepositoryProvider).getStoryIds(category);
 });
 
@@ -77,8 +79,10 @@ class FeedNotifier extends StateNotifier<FeedState> {
     state = state.copyWith(isLoading: true);
     try {
       final nextPage = state.currentPage + 1;
-      final moreStories =
-          await _repository.getStoriesPage(_allIds, page: nextPage);
+      final moreStories = await _repository.getStoriesPage(
+        _allIds,
+        page: nextPage,
+      );
       final allStories = [...state.stories, ...moreStories];
       state = state.copyWith(
         stories: allStories,
@@ -107,8 +111,9 @@ class FeedNotifier extends StateNotifier<FeedState> {
   }
 }
 
-final feedNotifierProvider =
-    StateNotifierProvider<FeedNotifier, FeedState>((ref) {
+final feedNotifierProvider = StateNotifierProvider<FeedNotifier, FeedState>((
+  ref,
+) {
   final repo = ref.watch(storyRepositoryProvider);
   return FeedNotifier(repo);
 });

@@ -27,12 +27,15 @@ class AlgoliaService {
   final Dio _dio;
 
   AlgoliaService({Dio? dio})
-      : _dio = dio ??
-            Dio(BaseOptions(
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
               baseUrl: HnConstants.algoliaBaseUrl,
               connectTimeout: const Duration(seconds: 10),
               receiveTimeout: const Duration(seconds: 10),
-            ));
+            ),
+          );
 
   Future<SearchResponse> search({
     required String query,

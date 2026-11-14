@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/api/algolia_service.dart';
 import '../../data/models/search_result.dart';
 
-final algoliaServiceProvider = Provider<AlgoliaService>((ref) => AlgoliaService());
+final algoliaServiceProvider = Provider<AlgoliaService>(
+  (ref) => AlgoliaService(),
+);
 
 class SearchState {
   final List<SearchHit> results;
@@ -115,5 +117,5 @@ class SearchNotifier extends StateNotifier<SearchState> {
 
 final searchNotifierProvider =
     StateNotifierProvider<SearchNotifier, SearchState>((ref) {
-  return SearchNotifier(ref.watch(algoliaServiceProvider));
-});
+      return SearchNotifier(ref.watch(algoliaServiceProvider));
+    });

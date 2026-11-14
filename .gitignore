@@ -53,3 +53,6 @@ android/local.properties
 
 # Gradle
 .gradle/
+
+# Kotlin build cache
+android/.kotlin/

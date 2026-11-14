@@ -36,22 +36,31 @@ class FeedCategoryDrawer extends ConsumerWidget {
                 _buildNavTile(
                   context,
                   icon: Icons.bookmark,
-                  label: 'Bookmarks',
+                  label: 'Saved',
                   onTap: () {
                     Navigator.pop(context);
-                    context.push('/bookmarks');
+                    context.go('/bookmarks');
                   },
                 ),
                 _buildNavTile(
                   context,
                   icon: Icons.publish,
-                  label: 'Publish to GitHub',
+                  label: 'This week',
                   onTap: () {
                     Navigator.pop(context);
-                    context.push('/publish');
+                    context.go('/publish');
                   },
                 ),
                 const Divider(),
+                _buildNavTile(
+                  context,
+                  icon: Icons.data_object,
+                  label: 'Comment exports',
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/exports');
+                  },
+                ),
                 _buildNavTile(
                   context,
                   icon: Icons.settings,
@@ -78,7 +87,11 @@ class FeedCategoryDrawer extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context, WidgetRef ref, AuthState authState) {
+  Widget _buildHeader(
+    BuildContext context,
+    WidgetRef ref,
+    AuthState authState,
+  ) {
     return DrawerHeader(
       decoration: const BoxDecoration(color: AppColors.primary),
       child: Column(
@@ -86,8 +99,7 @@ class FeedCategoryDrawer extends ConsumerWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.asset('hacker-news-square.png',
-                width: 56, height: 56),
+            child: Image.asset('hacker-news-square.png', width: 56, height: 56),
           ),
           const Spacer(),
           if (authState.isLoggedIn)
@@ -102,7 +114,11 @@ class FeedCategoryDrawer extends ConsumerWidget {
                   onTap: () {
                     ref.read(authNotifierProvider.notifier).logout();
                   },
-                  child: const Icon(Icons.logout, color: Colors.white, size: 20),
+                  child: const Icon(
+                    Icons.logout,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
               ],
             )
@@ -158,59 +174,77 @@ class FeedCategoryDrawer extends ConsumerWidget {
   void _showAboutDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.asset('hacker-news-square.png',
-                  width: 32, height: 32),
-            ),
-            const SizedBox(width: 12),
-            const Text('Glean',
-                style: TextStyle(
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'hacker-news-square.png',
+                    width: 32,
+                    height: 32,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Glean',
+                  style: TextStyle(
                     color: AppColors.textPrimary,
-                    fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'A Hacker News client with weekly curation and publishing to GitHub Pages.',
-              style: TextStyle(
-                  color: AppColors.textSecondary, fontSize: 14, height: 1.5),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'Version 1.0.5',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'A Hacker News client with weekly curation and publishing to GitHub Pages.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Version 1.1.0',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap:
+                      () => launchUrl(
+                        Uri.parse('https://www.gapp.in'),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                  child: const Text(
+                    'Created by Gapp\nwww.gapp.in',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            GestureDetector(
-              onTap: () => launchUrl(Uri.parse('https://www.gapp.in'),
-                  mode: LaunchMode.externalApplication),
-              child: const Text(
-                'Created by Gapp\nwww.gapp.in',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(color: AppColors.primary),
                 ),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child:
-                const Text('Close', style: TextStyle(color: AppColors.primary)),
+            ],
           ),
-        ],
-      ),
     );
   }
 }

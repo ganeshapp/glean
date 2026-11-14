@@ -30,8 +30,10 @@ class OpHeader extends StatelessWidget {
             const SizedBox(height: 8),
             GestureDetector(
               onTap: () async {
-                await launchUrl(Uri.parse(story.url!),
-                    mode: LaunchMode.externalApplication);
+                await launchUrl(
+                  Uri.parse(story.url!),
+                  mode: LaunchMode.externalApplication,
+                );
               },
               child: Text(
                 story.url!,
@@ -72,27 +74,28 @@ class _HtmlText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cleaned = html
-        .replaceAll(RegExp(r'<p>'), '\n\n')
-        .replaceAll(RegExp(r'<br\s*/?>'), '\n')
-        .replaceAll(RegExp(r'<i>'), '')
-        .replaceAll(RegExp(r'</i>'), '')
-        .replaceAll(RegExp(r'<b>'), '')
-        .replaceAll(RegExp(r'</b>'), '')
-        .replaceAll(RegExp(r'<a[^>]*>'), '')
-        .replaceAll(RegExp(r'</a>'), '')
-        .replaceAll(RegExp(r'<pre><code>'), '\n')
-        .replaceAll(RegExp(r'</code></pre>'), '\n')
-        .replaceAll(RegExp(r'<code>'), '')
-        .replaceAll(RegExp(r'</code>'), '')
-        .replaceAll(RegExp(r'<[^>]+>'), '')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&amp;', '&')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#x27;', "'")
-        .replaceAll('&#x2F;', '/')
-        .trim();
+    final cleaned =
+        html
+            .replaceAll(RegExp(r'<p>'), '\n\n')
+            .replaceAll(RegExp(r'<br\s*/?>'), '\n')
+            .replaceAll(RegExp(r'<i>'), '')
+            .replaceAll(RegExp(r'</i>'), '')
+            .replaceAll(RegExp(r'<b>'), '')
+            .replaceAll(RegExp(r'</b>'), '')
+            .replaceAll(RegExp(r'<a[^>]*>'), '')
+            .replaceAll(RegExp(r'</a>'), '')
+            .replaceAll(RegExp(r'<pre><code>'), '\n')
+            .replaceAll(RegExp(r'</code></pre>'), '\n')
+            .replaceAll(RegExp(r'<code>'), '')
+            .replaceAll(RegExp(r'</code>'), '')
+            .replaceAll(RegExp(r'<[^>]+>'), '')
+            .replaceAll('&gt;', '>')
+            .replaceAll('&lt;', '<')
+            .replaceAll('&amp;', '&')
+            .replaceAll('&quot;', '"')
+            .replaceAll('&#x27;', "'")
+            .replaceAll('&#x2F;', '/')
+            .trim();
 
     return Text(
       cleaned,

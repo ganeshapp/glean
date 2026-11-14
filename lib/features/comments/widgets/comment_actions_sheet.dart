@@ -31,16 +31,53 @@ class CommentActionsSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          _buildAction(context, Icons.arrow_upward, 'Upvote', CommentAction.upvote),
-          _buildAction(context, Icons.arrow_downward, 'Downvote', CommentAction.downvote),
+          _buildAction(
+            context,
+            Icons.copy,
+            'Copy text',
+            CommentAction.copyText,
+          ),
+          _buildAction(
+            context,
+            Icons.text_fields,
+            'Select text…',
+            CommentAction.selectText,
+          ),
+          _buildAction(
+            context,
+            Icons.arrow_upward,
+            'Upvote',
+            CommentAction.upvote,
+          ),
+          _buildAction(
+            context,
+            Icons.arrow_downward,
+            'Downvote',
+            CommentAction.downvote,
+          ),
           _buildAction(context, Icons.reply, 'Reply', CommentAction.reply),
-          _buildAction(context, Icons.person, 'Author profile', CommentAction.authorProfile),
-          _buildAction(context, Icons.share, 'Share link to...', CommentAction.shareLink),
-          _buildAction(context, Icons.send, 'Send comment text to...', CommentAction.sendText),
+          _buildAction(
+            context,
+            Icons.person,
+            'Author profile',
+            CommentAction.authorProfile,
+          ),
+          _buildAction(
+            context,
+            Icons.share,
+            'Share link to...',
+            CommentAction.shareLink,
+          ),
+          _buildAction(
+            context,
+            Icons.send,
+            'Send comment text to...',
+            CommentAction.sendText,
+          ),
           _buildAction(
             context,
             isBookmarked ? Icons.bookmark_remove : Icons.bookmark_add,
-            isBookmarked ? 'Remove bookmark' : 'Bookmark comment',
+            isBookmarked ? 'Saved · add a thought' : 'Save comment',
             CommentAction.bookmark,
           ),
           const SizedBox(height: 8),
@@ -50,7 +87,11 @@ class CommentActionsSheet extends StatelessWidget {
   }
 
   Widget _buildAction(
-      BuildContext context, IconData icon, String label, CommentAction action) {
+    BuildContext context,
+    IconData icon,
+    String label,
+    CommentAction action,
+  ) {
     return ListTile(
       leading: Icon(icon, color: AppColors.textPrimary),
       title: Text(label),
@@ -63,6 +104,8 @@ class CommentActionsSheet extends StatelessWidget {
 }
 
 enum CommentAction {
+  copyText,
+  selectText,
   upvote,
   downvote,
   reply,

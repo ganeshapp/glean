@@ -60,9 +60,10 @@ class SearchResponse {
 
   factory SearchResponse.fromJson(Map<String, dynamic> json) {
     return SearchResponse(
-      hits: (json['hits'] as List<dynamic>)
-          .map((h) => SearchHit.fromJson(h as Map<String, dynamic>))
-          .toList(),
+      hits:
+          (json['hits'] as List<dynamic>)
+              .map((h) => SearchHit.fromJson(h as Map<String, dynamic>))
+              .toList(),
       nbHits: (json['nbHits'] as int?) ?? 0,
       page: (json['page'] as int?) ?? 0,
       nbPages: (json['nbPages'] as int?) ?? 0,

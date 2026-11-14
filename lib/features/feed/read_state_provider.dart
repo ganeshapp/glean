@@ -19,13 +19,16 @@ class ReadStateNotifier extends StateNotifier<Set<int>> {
     state = {...state, storyId};
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(
-        _prefsKey, state.map((id) => id.toString()).toList());
+      _prefsKey,
+      state.map((id) => id.toString()).toList(),
+    );
   }
 
   bool isRead(int storyId) => state.contains(storyId);
 }
 
-final readStateProvider =
-    StateNotifierProvider<ReadStateNotifier, Set<int>>((ref) {
+final readStateProvider = StateNotifierProvider<ReadStateNotifier, Set<int>>((
+  ref,
+) {
   return ReadStateNotifier();
 });

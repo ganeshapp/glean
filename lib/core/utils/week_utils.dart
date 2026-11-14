@@ -1,48 +1,28 @@
+import 'package:intl/intl.dart';
+
 class WeekUtils {
   WeekUtils._();
-
-  static int isoWeekNumber(DateTime date) {
-    final dayOfYear = date.difference(DateTime(date.year, 1, 1)).inDays;
-    final weekday = date.weekday;
-    final weekNumber = ((dayOfYear - weekday + 10) / 7).floor();
-
-    if (weekNumber < 1) {
-      return isoWeekNumber(DateTime(date.year - 1, 12, 31));
-    }
-    if (weekNumber > 52) {
-      final dec31 = DateTime(date.year, 12, 31);
-      if (dec31.weekday < 4) return 1;
-    }
-    return weekNumber;
+  static DateTime _thursday(DateTime date) {
+    final day = DateTime.utc(date.year, date.month, date.day);
+    return day.add(Duration(days: DateTime.thursday - day.weekday));
   }
 
-  static int isoWeekYear(DateTime date) {
-    final weekNum = isoWeekNumber(date);
-    if (weekNum >= 52 && date.month == 1) return date.year - 1;
-    if (weekNum == 1 && date.month == 12) return date.year + 1;
-    return date.year;
+  static int isoWeekYear(DateTime date) => _thursday(date).year;
+  static int isoWeekNumber(DateTime date) {
+    final thursday = _thursday(date);
+    return 1 +
+        thursday.difference(DateTime.utc(thursday.year, 1, 1)).inDays ~/ 7;
   }
 
   static String weekLabel([DateTime? date]) {
-    date ??= DateTime.now();
-    final year = isoWeekYear(date);
-    final week = isoWeekNumber(date);
-    return '$year${week.toString().padLeft(2, '0')}';
+    final day = date ?? DateTime.now();
+    return '${isoWeekYear(day)}-W${isoWeekNumber(day).toString().padLeft(2, '0')}';
   }
 
   static String weekDateRange([DateTime? date]) {
-    date ??= DateTime.now();
-    final weekday = date.weekday;
-    final monday = date.subtract(Duration(days: weekday - 1));
-    final sunday = monday.add(const Duration(days: 6));
-    return '${_fmt(monday)} - ${_fmt(sunday)}';
-  }
-
-  static String _fmt(DateTime d) {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${months[d.month - 1]} ${d.day}';
+    final d = date ?? DateTime.now();
+    final day = DateTime.utc(d.year, d.month, d.day);
+    final monday = day.subtract(Duration(days: day.weekday - 1));
+    return '${DateFormat('MMM d').format(monday)} – ${DateFormat('MMM d').format(monday.add(const Duration(days: 6)))}';
   }
 }

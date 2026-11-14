@@ -8,12 +8,15 @@ class HnApiService {
   final Dio _dio;
 
   HnApiService({Dio? dio})
-      : _dio = dio ??
-            Dio(BaseOptions(
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
               baseUrl: HnConstants.firebaseBaseUrl,
               connectTimeout: const Duration(seconds: 10),
               receiveTimeout: const Duration(seconds: 10),
-            ));
+            ),
+          );
 
   Future<List<int>> getStoryIds(String endpoint) async {
     final response = await _dio.get('/$endpoint.json');
