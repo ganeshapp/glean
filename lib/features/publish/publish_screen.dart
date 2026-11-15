@@ -6,6 +6,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/utils/content_utils.dart';
 import '../../core/utils/markdown_generator.dart';
 import '../../core/utils/week_utils.dart';
+import '../../core/utils/photo_paths.dart';
+import '../photos/photo_import_service.dart';
+import '../photos/roundup_photo_view.dart';
 import '../../data/api/github_service.dart';
 import '../../data/database/app_database.dart';
 import '../bookmarks/bookmark_provider.dart';
@@ -144,15 +147,29 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
                                         ),
                                         const SizedBox(height: 8),
                                         const Text(
-                                          'Add saved items, drag them into any order, and tap a card to edit what readers will see.',
+                                          'Add saved items or photos, drag them into any order, and tap a card to edit what readers will see.',
                                           textAlign: TextAlign.center,
                                         ),
                                         const SizedBox(height: 16),
                                         FilledButton.icon(
                                           onPressed:
-                                              () => addItems(draft, list),
+                                              busy
+                                                  ? null
+                                                  : () => addItems(draft, list),
                                           icon: const Icon(Icons.add),
                                           label: const Text('Add saved items'),
+                                        ),
+                                        TextButton.icon(
+                                          onPressed:
+                                              busy
+                                                  ? null
+                                                  : () => addPhotos(draft),
+                                          icon: const Icon(
+                                            Icons.add_photo_alternate_outlined,
+                                          ),
+                                          label: const Text(
+                                            'Add photos from gallery',
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -283,11 +300,19 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
                                                   ),
                                                 ],
                                               ),
+                                              if (card.photoId != null)
+                                                RoundupPhotoView(
+                                                  photoId: card.photoId!,
+                                                  caption: card.title,
+                                                  maxHeight: 220,
+                                                ),
                                               Text(
                                                 card.title.isNotEmpty
                                                     ? card.title
                                                     : card.excerpt.isNotEmpty
                                                     ? card.excerpt
+                                                    : card.type == 'photo'
+                                                    ? 'Add a caption'
                                                     : card.url,
                                                 maxLines: 4,
                                                 overflow: TextOverflow.ellipsis,
@@ -327,9 +352,9 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
                           child: Row(
                             children: [
                               IconButton(
-                                tooltip: 'Add saved items',
+                                tooltip: 'Add items or photos',
                                 onPressed:
-                                    busy ? null : () => addItems(draft, list),
+                                    busy ? null : () => addContent(draft, list),
                                 icon: const Icon(Icons.add),
                               ),
                               Expanded(
@@ -455,6 +480,44 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
     await Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => RoundupCardEditor(card: card)));
+  }
+
+  Future<void> addContent(RoundupIssue issue, List<RoundupCard> cards) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder:
+          (ctx) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.bookmark_outline),
+                  title: const Text('Add saved items'),
+                  onTap: () => Navigator.pop(ctx, 'saved'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.add_photo_alternate_outlined),
+                  title: const Text('Add photos from gallery'),
+                  subtitle: const Text(
+                    'Select several photos; each gets its own card.',
+                  ),
+                  onTap: () => Navigator.pop(ctx, 'photos'),
+                ),
+              ],
+            ),
+          ),
+    );
+    if (!mounted) return;
+    if (choice == 'photos') await addPhotos(issue);
+    if (choice == 'saved') await addItems(issue, cards);
+  }
+
+  Future<void> addPhotos(RoundupIssue issue) async {
+    await run(() async {
+      setState(() => message = 'Adding photos…');
+      final result = await ref.read(photoImportProvider).pick(issue.id);
+      if (mounted) setState(() => message = result?.message);
+    });
   }
 
   Future<void> addItems(RoundupIssue issue, List<RoundupCard> cards) async {
@@ -588,8 +651,16 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
             appBar: AppBar(title: const Text('Reader preview')),
             body: Markdown(
               data:
-                  '# ${MarkdownGenerator.text(issue.title)}\n\n${MarkdownGenerator.body(issue, cards)}',
+                  '# ${MarkdownGenerator.text(issue.title)}\n\n${MarkdownGenerator.body(issue, cards, forPreview: true)}',
               selectable: true,
+              sizedImageBuilder:
+                  (config) =>
+                      config.uri.scheme == 'glean-photo'
+                          ? RoundupPhotoView(
+                            photoId: config.uri.path,
+                            caption: config.alt ?? '',
+                          )
+                          : const Text('Image unavailable'),
               onTapLink: (_, url, _) {
                 if (safeWebUrl(url) != null) {
                   launchUrl(
@@ -677,6 +748,26 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
         branch: snapshot.branch!,
         content: MarkdownGenerator.document(snapshot, cards),
         expectedSha: snapshot.remoteSha,
+        assets:
+            publication.photos
+                .map(
+                  (photo) => GitHubAsset(
+                    PhotoPaths.repositoryPath(snapshot, photo.id),
+                    photo.bytes,
+                  ),
+                )
+                .toList(),
+        onPhotoProgress: (done, total) {
+          if (mounted) {
+            setState(
+              () =>
+                  message =
+                      done == total
+                          ? 'Publishing roundup…'
+                          : 'Uploading photos: $done of $total…',
+            );
+          }
+        },
       );
       await repo.recordPublication(snapshot, cards, result.sha);
       if (mounted) {
@@ -879,11 +970,21 @@ class _RoundupCardEditorState extends ConsumerState<RoundupCardEditor> {
             'Everything on this card is public when you publish the issue.',
           ),
           const SizedBox(height: 16),
+          if (widget.card.photoId != null) ...[
+            RoundupPhotoView(
+              photoId: widget.card.photoId!,
+              caption: title.text,
+            ),
+            const SizedBox(height: 16),
+          ],
           TextField(
             controller: title,
             maxLines: null,
-            decoration: const InputDecoration(
-              labelText: 'Title (optional for quotes)',
+            decoration: InputDecoration(
+              labelText:
+                  widget.card.type == 'photo'
+                      ? 'Caption (optional)'
+                      : 'Title (optional for quotes)',
             ),
           ),
           const SizedBox(height: 16),
@@ -891,8 +992,11 @@ class _RoundupCardEditorState extends ConsumerState<RoundupCardEditor> {
             controller: blurb,
             minLines: 4,
             maxLines: null,
-            decoration: const InputDecoration(
-              labelText: 'Your public thought',
+            decoration: InputDecoration(
+              labelText:
+                  widget.card.type == 'photo'
+                      ? 'About this photo (optional)'
+                      : 'Your public thought',
               hintText: 'What makes this worth sharing?',
             ),
           ),
@@ -903,28 +1007,30 @@ class _RoundupCardEditorState extends ConsumerState<RoundupCardEditor> {
               label: const Text('Use my saved thought as public text'),
             ),
           const SizedBox(height: 16),
-          TextField(
-            controller: excerpt,
-            minLines: 3,
-            maxLines: null,
-            decoration: const InputDecoration(
-              labelText: 'Source excerpt / quote',
+          if (widget.card.type != 'photo') ...[
+            TextField(
+              controller: excerpt,
+              minLines: 3,
+              maxLines: null,
+              decoration: const InputDecoration(
+                labelText: 'Source excerpt / quote',
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: author,
-            decoration: const InputDecoration(
-              labelText: 'Author / attribution',
+            const SizedBox(height: 16),
+            TextField(
+              controller: author,
+              decoration: const InputDecoration(
+                labelText: 'Author / attribution',
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: url,
-            keyboardType: TextInputType.url,
-            decoration: const InputDecoration(labelText: 'Source URL'),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            TextField(
+              controller: url,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(labelText: 'Source URL'),
+            ),
+            const SizedBox(height: 24),
+          ],
         ],
       ),
     ),

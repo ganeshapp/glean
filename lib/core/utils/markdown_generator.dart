@@ -1,6 +1,8 @@
 import 'dart:convert';
 import '../../data/database/app_database.dart';
 import 'content_utils.dart';
+import 'photo_paths.dart';
+import 'youtube_video.dart';
 
 class MarkdownGenerator {
   MarkdownGenerator._();
@@ -17,20 +19,57 @@ class MarkdownGenerator {
         : '[${text(label)}](<${safe.replaceAll('>', '%3E').replaceAll('<', '%3C')}>)';
   }
 
-  static String body(RoundupIssue issue, List<RoundupCard> cards) {
+  static String paragraph(String value) {
+    final out = StringBuffer();
+    var end = 0;
+    for (final match in RegExp(r'https?://[^\s<>]+').allMatches(value)) {
+      var url = match.group(0)!.replaceAll(RegExp(r'[.,;!?]+$'), '');
+      while (url.endsWith(')') &&
+          ')'.allMatches(url).length > '('.allMatches(url).length) {
+        url = url.substring(0, url.length - 1);
+      }
+      out.write(text(value.substring(end, match.start)));
+      final safe = safeWebUrl(url);
+      out.write(safe == null ? text(url) : _link(url, safe));
+      end = match.start + url.length;
+    }
+    out.write(text(value.substring(end)));
+    return out.toString();
+  }
+
+  static String body(
+    RoundupIssue issue,
+    List<RoundupCard> cards, {
+    bool forPreview = false,
+  }) {
     final out = <String>[];
     if (issue.introduction.trim().isNotEmpty) {
-      out.add(text(issue.introduction.trim()));
+      out.add(paragraph(issue.introduction.trim()));
     }
     // Preserve the caller's editorial order, including mixed sources.
     for (final card in cards) {
       final quote = card.type == 'hnComment' || card.type == 'tweet';
-      if (quote) {
+      if (card.type == 'photo') {
+        final id = card.photoId;
+        if (id == null || !PhotoPaths.validId(id)) {
+          throw StateError('This photo is missing.');
+        }
+        final url =
+            forPreview ? 'glean-photo:$id' : PhotoPaths.publicUrl(issue, id);
+        final alt =
+            card.title.trim().isEmpty
+                ? 'Roundup photo'
+                : card.title.trim().replaceAll('\n', ' ');
+        out.add('![${text(alt)}](<$url>)');
+        if (card.title.trim().isNotEmpty) {
+          out.add('*${paragraph(card.title.trim())}*');
+        }
+      } else if (quote) {
         if (card.excerpt.isNotEmpty) {
           out.add(
             card.excerpt
                 .split('\n')
-                .map((line) => '> ${text(line)}')
+                .map((line) => '> ${paragraph(line)}')
                 .join('\n'),
           );
         }
@@ -45,12 +84,16 @@ class MarkdownGenerator {
           out.add(
             card.excerpt
                 .split('\n')
-                .map((line) => '> ${text(line)}')
+                .map((line) => '> ${paragraph(line)}')
                 .join('\n'),
           );
         }
       }
-      if (card.blurb.trim().isNotEmpty) out.add(text(card.blurb.trim()));
+      final video = card.type == 'photo' ? null : YouTubeVideo.parse(card.url);
+      if (video != null) {
+        out.add(forPreview ? _link('Play on YouTube', card.url) : video.iframe);
+      }
+      if (card.blurb.trim().isNotEmpty) out.add(paragraph(card.blurb.trim()));
       if (card.discussionUrl.isNotEmpty && card.discussionUrl != card.url) {
         out.add(_link('HN discussion', card.discussionUrl));
       }

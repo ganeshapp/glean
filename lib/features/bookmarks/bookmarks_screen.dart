@@ -212,6 +212,7 @@ class _BookmarksScreenState extends ConsumerState<BookmarksScreen> {
 }
 
 String typeLabel(String type) => switch (type) {
+  'photo' => 'Photo',
   'hnArticle' => 'HN article',
   'hnComment' => 'HN comment',
   'tweet' => 'Post',

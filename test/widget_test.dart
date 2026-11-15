@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'photos_test.dart' show fixturePhoto;
+import 'package:glean/features/photos/roundup_photo_view.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -280,4 +282,49 @@ void main() {
     await t.pump(const Duration(milliseconds: 10));
     await t.runAsync(() => db.close());
   });
+  testWidgets(
+    'photo cards reorder, edit caption and explanation, and render locally in preview',
+    (t) async {
+      phone(t);
+      final repo = RoundupRepository(db);
+      final photo = fixturePhoto();
+      await repo.addPhoto(issue.id, photo);
+      var list = await repo.cards(issue.id);
+      await repo.reorder(issue.id, [list.last.id, list.first.id, list[1].id]);
+      await t.pumpWidget(host(PublishScreen(issueId: issue.id)));
+      await settle(t);
+      expect(find.byType(RoundupPhotoView), findsOneWidget);
+      await t.tap(find.text('Add a caption'));
+      await settle(t);
+      expect(find.byType(TextField), findsNWidgets(2));
+      await t.enterText(find.byType(TextField).first, 'Morning light');
+      await t.enterText(
+        find.byType(TextField).last,
+        'A useful reminder to look up.',
+      );
+      await settle(t);
+      list = (await t.runAsync(() => repo.cards(issue.id)))!;
+      expect(list.first.title, 'Morning light');
+      expect(list.first.blurb, 'A useful reminder to look up.');
+      await capture(t, 'photo-editor');
+      await t.pageBack();
+      await settle(t);
+      await t.tap(find.byType(PopupMenuButton<String>).first);
+      await t.pumpAndSettle();
+      await t.tap(find.text('Move down'));
+      await settle(t);
+      list = (await t.runAsync(() => repo.cards(issue.id)))!;
+      expect(list[1].photoId, photo.id);
+      await capture(t, 'photos-in-roundup');
+      await t.tap(find.text('Preview'));
+      await settle(t);
+      expect(find.byType(RoundupPhotoView), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
+      await capture(t, 'photo-preview');
+      expect(t.takeException(), isNull);
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(milliseconds: 10));
+      await t.runAsync(() => db.close());
+    },
+  );
 }

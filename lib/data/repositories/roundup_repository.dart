@@ -24,10 +24,51 @@ class RoundupRepository {
 
   Future<RoundupIssue> getIssue(String id) =>
       (db.select(db.roundupIssues)..where((t) => t.id.equals(id))).getSingle();
-  Future<({RoundupIssue issue, List<RoundupCard> cards})> snapshot(String id) =>
-      db.transaction(
-        () async => (issue: await getIssue(id), cards: await cards(id)),
+  Future<
+    ({RoundupIssue issue, List<RoundupCard> cards, List<RoundupPhoto> photos})
+  >
+  snapshot(String id) => db.transaction(() async {
+    final entries = await cards(id);
+    final ids = entries.map((c) => c.photoId).whereType<String>().toSet();
+    final photos =
+        await (db.select(db.roundupPhotos)..where((t) => t.id.isIn(ids))).get();
+    if (photos.length != ids.length ||
+        entries.any((c) => c.type == 'photo' && c.photoId == null)) {
+      throw StateError(
+        'A photo is missing. Remove its card and add it from your gallery again.',
       );
+    }
+    return (issue: await getIssue(id), cards: entries, photos: photos);
+  });
+
+  Stream<RoundupPhoto?> watchPhoto(String id) =>
+      (db.select(db.roundupPhotos)
+        ..where((t) => t.id.equals(id))).watchSingleOrNull();
+
+  Future<bool> addPhoto(String issueId, RoundupPhoto photo) =>
+      db.transaction(() async {
+        final existing =
+            await (db.select(db.roundupCards)..where(
+              (t) => t.issueId.equals(issueId) & t.photoId.equals(photo.id),
+            )).get();
+        if (existing.isNotEmpty) return false;
+        await db
+            .into(db.roundupPhotos)
+            .insert(photo, mode: InsertMode.insertOrIgnore);
+        final list = await cards(issueId);
+        await db
+            .into(db.roundupCards)
+            .insert(
+              RoundupCardsCompanion.insert(
+                issueId: issueId,
+                position: list.length,
+                type: 'photo',
+                photoId: Value(photo.id),
+              ),
+            );
+        await _touch(issueId);
+        return true;
+      });
   Stream<RoundupIssue> watchIssue(String id) =>
       (db.select(db.roundupIssues)
         ..where((t) => t.id.equals(id))).watchSingle();
@@ -127,6 +168,15 @@ class RoundupRepository {
 
   Future<void> removeCard(RoundupCard card) => db.transaction(() async {
     await (db.delete(db.roundupCards)..where((t) => t.id.equals(card.id))).go();
+    if (card.photoId != null) {
+      final used =
+          await (db.select(db.roundupCards)
+            ..where((t) => t.photoId.equals(card.photoId!))).get();
+      if (used.isEmpty) {
+        await (db.delete(db.roundupPhotos)
+          ..where((t) => t.id.equals(card.photoId!))).go();
+      }
+    }
     final remaining = await cards(card.issueId);
     for (var i = 0; i < remaining.length; i++) {
       await (db.update(db.roundupCards)..where(

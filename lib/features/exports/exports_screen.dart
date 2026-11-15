@@ -1,15 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../data/api/comment_export_service.dart';
 import '../../data/database/app_database.dart';
 import '../bookmarks/bookmark_provider.dart';
 import 'export_jobs.dart';
+import 'export_sharing.dart';
 
 class ExportsScreen extends ConsumerStatefulWidget {
   const ExportsScreen({super.key});
@@ -44,26 +42,42 @@ class _ExportsScreenState extends ConsumerState<ExportsScreen> {
     }
   }
 
-  Future<void> share(CommentExport job) async {
+  Future<void> exportAction(CommentExport job, String action) async {
     try {
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/hn-${job.id}.json');
-      await file.writeAsString(job.jsonContent!, flush: true);
-      await Share.shareXFiles(
-        [XFile(file.path, mimeType: 'application/json')],
-        subject: job.title,
-        text: CommentExportService.analysisPrompt,
-      );
+      setState(() => error = null);
+      if (action == 'text') {
+        final inline = await ExportSharing.shareText(job);
+        if (!inline && mounted) {
+          showNotice(
+            'This discussion is long, so it was shared as a text file with the prompt included.',
+          );
+        }
+      } else if (action == 'save' || action == 'save-json') {
+        final result = await ExportSharing.save(
+          job,
+          rawJson: action == 'save-json',
+        );
+        if (result != null && mounted) {
+          showNotice(
+            action == 'save'
+                ? 'Saved with the prompt. Attach this file in Gemini or another AI app.'
+                : 'JSON saved to your device.',
+          );
+        }
+      } else {
+        await ExportSharing.shareFile(job, rawJson: action == 'json');
+      }
     } catch (_) {
       if (mounted) {
         setState(
-          () =>
-              error =
-                  'Could not share the JSON file. Try saving or sharing again.',
+          () => error = 'Could not export this discussion. Please try again.',
         );
       }
     }
   }
+
+  void showNotice(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -89,7 +103,11 @@ class _ExportsScreenState extends ConsumerState<ExportsScreen> {
               padding: const EdgeInsets.all(16),
               children: [
                 const Text(
-                  'Download ranked HN discussions, then share the JSON with an AI app to explore insights and interesting angles. HN does not expose comment vote totals.',
+                  'Share ranked HN discussions to explore insights and interesting angles. The AI text file includes both the prompt and the exported discussion. HN does not expose comment vote totals.',
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Gemini missing from the share sheet? Try Share as text, or Save for AI and attach the saved file in Gemini. The prompt is already inside.',
                 ),
                 const SizedBox(height: 12),
                 if (error != null) Text(error!),
@@ -180,9 +198,34 @@ class _ExportsScreenState extends ConsumerState<ExportsScreen> {
                             children: [
                               if (job.status == 'ready') ...[
                                 FilledButton.icon(
-                                  onPressed: () => share(job),
+                                  onPressed: () => exportAction(job, 'ai'),
                                   icon: const Icon(Icons.ios_share),
-                                  label: const Text('Share JSON'),
+                                  label: const Text('Share for AI'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: () => exportAction(job, 'save'),
+                                  icon: const Icon(Icons.save_alt),
+                                  label: const Text('Save for AI'),
+                                ),
+                                TextButton(
+                                  onPressed: () => exportAction(job, 'text'),
+                                  child: const Text('Share as text'),
+                                ),
+                                PopupMenuButton<String>(
+                                  tooltip: 'JSON options',
+                                  onSelected:
+                                      (action) => exportAction(job, action),
+                                  itemBuilder:
+                                      (_) => const [
+                                        PopupMenuItem(
+                                          value: 'json',
+                                          child: Text('Share JSON'),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'save-json',
+                                          child: Text('Save JSON to device'),
+                                        ),
+                                      ],
                                 ),
                                 TextButton(
                                   onPressed: () async {

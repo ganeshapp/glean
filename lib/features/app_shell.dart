@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'share_receiver/share_handler.dart';
 import 'publish/roundup_provider.dart';
+import 'photos/photo_import_service.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigation;
@@ -21,8 +22,36 @@ class _AppShellState extends ConsumerState<AppShell>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         handler = ShareHandler(ref, context)..init();
+        recoverPhotos();
       }
     });
+  }
+
+  Future<void> recoverPhotos() async {
+    try {
+      final result = await ref.read(photoImportProvider).recover();
+      if (result != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message),
+            action: SnackBarAction(
+              label: 'Open draft',
+              onPressed: () => context.push('/issue/${result.issueId}'),
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not recover selected photos. Please select them again.',
+            ),
+          ),
+        );
+      }
+    }
   }
 
   @override

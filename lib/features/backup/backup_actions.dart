@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../photos/photo_import_service.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
@@ -14,6 +16,9 @@ class BackupActions {
     try {
       final raw =
           await BackupRepository(ref.read(appDatabaseProvider)).export();
+      if (utf8.encode(raw).length > BackupRepository.maxBytes) {
+        throw const FormatException('Backup exceeds the 200 MB limit.');
+      }
       final result = await FilePicker.platform.saveFile(
         dialogTitle: 'Save Glean backup',
         fileName:
@@ -47,7 +52,7 @@ class BackupActions {
       );
       if (result == null) return;
       final file = result.files.single;
-      if (file.size > 50 * 1024 * 1024) {
+      if (file.size > BackupRepository.maxBytes) {
         throw const FormatException('Backup is too large.');
       }
       final bytes = file.bytes ?? await File(file.path!).readAsBytes();
@@ -60,7 +65,7 @@ class BackupActions {
             (ctx) => AlertDialog(
               title: const Text('Replace local library?'),
               content: Text(
-                'Restore ${data.bookmarks.length} saved items and ${data.issues.length} issues. This replaces the current library, drafts, and exports. GitHub sign-in stays unchanged. Make a backup first if you want to keep the current data.',
+                'Restore ${data.bookmarks.length} saved items and ${data.issues.length} issues with ${data.photos.length} photos. This replaces the current library, drafts, and exports. GitHub sign-in stays unchanged. Make a backup first if you want to keep the current data.',
               ),
               actions: [
                 TextButton(
@@ -80,6 +85,9 @@ class BackupActions {
         if (job.status != 'ready') await jobs.delete(job.id);
       }
       await repo.restore(data);
+      await (await SharedPreferences.getInstance()).remove(
+        PhotoImportService.pendingKey,
+      );
       ref.invalidate(currentIssueProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(

@@ -1602,6 +1602,315 @@ class RoundupIssuesCompanion extends UpdateCompanion<RoundupIssue> {
   }
 }
 
+class $RoundupPhotosTable extends RoundupPhotos
+    with TableInfo<$RoundupPhotosTable, RoundupPhoto> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RoundupPhotosTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bytesMeta = const VerificationMeta('bytes');
+  @override
+  late final GeneratedColumn<Uint8List> bytes = GeneratedColumn<Uint8List>(
+    'bytes',
+    aliasedName,
+    false,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _widthMeta = const VerificationMeta('width');
+  @override
+  late final GeneratedColumn<int> width = GeneratedColumn<int>(
+    'width',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _heightMeta = const VerificationMeta('height');
+  @override
+  late final GeneratedColumn<int> height = GeneratedColumn<int>(
+    'height',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, bytes, width, height];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'roundup_photos';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RoundupPhoto> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('bytes')) {
+      context.handle(
+        _bytesMeta,
+        bytes.isAcceptableOrUnknown(data['bytes']!, _bytesMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bytesMeta);
+    }
+    if (data.containsKey('width')) {
+      context.handle(
+        _widthMeta,
+        width.isAcceptableOrUnknown(data['width']!, _widthMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_widthMeta);
+    }
+    if (data.containsKey('height')) {
+      context.handle(
+        _heightMeta,
+        height.isAcceptableOrUnknown(data['height']!, _heightMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_heightMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RoundupPhoto map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RoundupPhoto(
+      id:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}id'],
+          )!,
+      bytes:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.blob,
+            data['${effectivePrefix}bytes'],
+          )!,
+      width:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.int,
+            data['${effectivePrefix}width'],
+          )!,
+      height:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.int,
+            data['${effectivePrefix}height'],
+          )!,
+    );
+  }
+
+  @override
+  $RoundupPhotosTable createAlias(String alias) {
+    return $RoundupPhotosTable(attachedDatabase, alias);
+  }
+}
+
+class RoundupPhoto extends DataClass implements Insertable<RoundupPhoto> {
+  final String id;
+  final Uint8List bytes;
+  final int width;
+  final int height;
+  const RoundupPhoto({
+    required this.id,
+    required this.bytes,
+    required this.width,
+    required this.height,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['bytes'] = Variable<Uint8List>(bytes);
+    map['width'] = Variable<int>(width);
+    map['height'] = Variable<int>(height);
+    return map;
+  }
+
+  RoundupPhotosCompanion toCompanion(bool nullToAbsent) {
+    return RoundupPhotosCompanion(
+      id: Value(id),
+      bytes: Value(bytes),
+      width: Value(width),
+      height: Value(height),
+    );
+  }
+
+  factory RoundupPhoto.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RoundupPhoto(
+      id: serializer.fromJson<String>(json['id']),
+      bytes: serializer.fromJson<Uint8List>(json['bytes']),
+      width: serializer.fromJson<int>(json['width']),
+      height: serializer.fromJson<int>(json['height']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'bytes': serializer.toJson<Uint8List>(bytes),
+      'width': serializer.toJson<int>(width),
+      'height': serializer.toJson<int>(height),
+    };
+  }
+
+  RoundupPhoto copyWith({
+    String? id,
+    Uint8List? bytes,
+    int? width,
+    int? height,
+  }) => RoundupPhoto(
+    id: id ?? this.id,
+    bytes: bytes ?? this.bytes,
+    width: width ?? this.width,
+    height: height ?? this.height,
+  );
+  RoundupPhoto copyWithCompanion(RoundupPhotosCompanion data) {
+    return RoundupPhoto(
+      id: data.id.present ? data.id.value : this.id,
+      bytes: data.bytes.present ? data.bytes.value : this.bytes,
+      width: data.width.present ? data.width.value : this.width,
+      height: data.height.present ? data.height.value : this.height,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoundupPhoto(')
+          ..write('id: $id, ')
+          ..write('bytes: $bytes, ')
+          ..write('width: $width, ')
+          ..write('height: $height')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, $driftBlobEquality.hash(bytes), width, height);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RoundupPhoto &&
+          other.id == this.id &&
+          $driftBlobEquality.equals(other.bytes, this.bytes) &&
+          other.width == this.width &&
+          other.height == this.height);
+}
+
+class RoundupPhotosCompanion extends UpdateCompanion<RoundupPhoto> {
+  final Value<String> id;
+  final Value<Uint8List> bytes;
+  final Value<int> width;
+  final Value<int> height;
+  final Value<int> rowid;
+  const RoundupPhotosCompanion({
+    this.id = const Value.absent(),
+    this.bytes = const Value.absent(),
+    this.width = const Value.absent(),
+    this.height = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RoundupPhotosCompanion.insert({
+    required String id,
+    required Uint8List bytes,
+    required int width,
+    required int height,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       bytes = Value(bytes),
+       width = Value(width),
+       height = Value(height);
+  static Insertable<RoundupPhoto> custom({
+    Expression<String>? id,
+    Expression<Uint8List>? bytes,
+    Expression<int>? width,
+    Expression<int>? height,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (bytes != null) 'bytes': bytes,
+      if (width != null) 'width': width,
+      if (height != null) 'height': height,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RoundupPhotosCompanion copyWith({
+    Value<String>? id,
+    Value<Uint8List>? bytes,
+    Value<int>? width,
+    Value<int>? height,
+    Value<int>? rowid,
+  }) {
+    return RoundupPhotosCompanion(
+      id: id ?? this.id,
+      bytes: bytes ?? this.bytes,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (bytes.present) {
+      map['bytes'] = Variable<Uint8List>(bytes.value);
+    }
+    if (width.present) {
+      map['width'] = Variable<int>(width.value);
+    }
+    if (height.present) {
+      map['height'] = Variable<int>(height.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoundupPhotosCompanion(')
+          ..write('id: $id, ')
+          ..write('bytes: $bytes, ')
+          ..write('width: $width, ')
+          ..write('height: $height, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $RoundupCardsTable extends RoundupCards
     with TableInfo<$RoundupCardsTable, RoundupCard> {
   @override
@@ -1730,6 +2039,20 @@ class $RoundupCardsTable extends RoundupCards
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _photoIdMeta = const VerificationMeta(
+    'photoId',
+  );
+  @override
+  late final GeneratedColumn<String> photoId = GeneratedColumn<String>(
+    'photo_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES roundup_photos (id)',
+    ),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1743,6 +2066,7 @@ class $RoundupCardsTable extends RoundupCards
     excerpt,
     author,
     blurb,
+    photoId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1828,6 +2152,12 @@ class $RoundupCardsTable extends RoundupCards
         blurb.isAcceptableOrUnknown(data['blurb']!, _blurbMeta),
       );
     }
+    if (data.containsKey('photo_id')) {
+      context.handle(
+        _photoIdMeta,
+        photoId.isAcceptableOrUnknown(data['photo_id']!, _photoIdMeta),
+      );
+    }
     return context;
   }
 
@@ -1891,6 +2221,10 @@ class $RoundupCardsTable extends RoundupCards
             DriftSqlType.string,
             data['${effectivePrefix}blurb'],
           )!,
+      photoId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}photo_id'],
+      ),
     );
   }
 
@@ -1912,6 +2246,7 @@ class RoundupCard extends DataClass implements Insertable<RoundupCard> {
   final String excerpt;
   final String author;
   final String blurb;
+  final String? photoId;
   const RoundupCard({
     required this.id,
     required this.issueId,
@@ -1924,6 +2259,7 @@ class RoundupCard extends DataClass implements Insertable<RoundupCard> {
     required this.excerpt,
     required this.author,
     required this.blurb,
+    this.photoId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1941,6 +2277,9 @@ class RoundupCard extends DataClass implements Insertable<RoundupCard> {
     map['excerpt'] = Variable<String>(excerpt);
     map['author'] = Variable<String>(author);
     map['blurb'] = Variable<String>(blurb);
+    if (!nullToAbsent || photoId != null) {
+      map['photo_id'] = Variable<String>(photoId);
+    }
     return map;
   }
 
@@ -1960,6 +2299,10 @@ class RoundupCard extends DataClass implements Insertable<RoundupCard> {
       excerpt: Value(excerpt),
       author: Value(author),
       blurb: Value(blurb),
+      photoId:
+          photoId == null && nullToAbsent
+              ? const Value.absent()
+              : Value(photoId),
     );
   }
 
@@ -1980,6 +2323,7 @@ class RoundupCard extends DataClass implements Insertable<RoundupCard> {
       excerpt: serializer.fromJson<String>(json['excerpt']),
       author: serializer.fromJson<String>(json['author']),
       blurb: serializer.fromJson<String>(json['blurb']),
+      photoId: serializer.fromJson<String?>(json['photoId']),
     );
   }
   @override
@@ -1997,6 +2341,7 @@ class RoundupCard extends DataClass implements Insertable<RoundupCard> {
       'excerpt': serializer.toJson<String>(excerpt),
       'author': serializer.toJson<String>(author),
       'blurb': serializer.toJson<String>(blurb),
+      'photoId': serializer.toJson<String?>(photoId),
     };
   }
 
@@ -2012,6 +2357,7 @@ class RoundupCard extends DataClass implements Insertable<RoundupCard> {
     String? excerpt,
     String? author,
     String? blurb,
+    Value<String?> photoId = const Value.absent(),
   }) => RoundupCard(
     id: id ?? this.id,
     issueId: issueId ?? this.issueId,
@@ -2024,6 +2370,7 @@ class RoundupCard extends DataClass implements Insertable<RoundupCard> {
     excerpt: excerpt ?? this.excerpt,
     author: author ?? this.author,
     blurb: blurb ?? this.blurb,
+    photoId: photoId.present ? photoId.value : this.photoId,
   );
   RoundupCard copyWithCompanion(RoundupCardsCompanion data) {
     return RoundupCard(
@@ -2042,6 +2389,7 @@ class RoundupCard extends DataClass implements Insertable<RoundupCard> {
       excerpt: data.excerpt.present ? data.excerpt.value : this.excerpt,
       author: data.author.present ? data.author.value : this.author,
       blurb: data.blurb.present ? data.blurb.value : this.blurb,
+      photoId: data.photoId.present ? data.photoId.value : this.photoId,
     );
   }
 
@@ -2058,7 +2406,8 @@ class RoundupCard extends DataClass implements Insertable<RoundupCard> {
           ..write('discussionUrl: $discussionUrl, ')
           ..write('excerpt: $excerpt, ')
           ..write('author: $author, ')
-          ..write('blurb: $blurb')
+          ..write('blurb: $blurb, ')
+          ..write('photoId: $photoId')
           ..write(')'))
         .toString();
   }
@@ -2076,6 +2425,7 @@ class RoundupCard extends DataClass implements Insertable<RoundupCard> {
     excerpt,
     author,
     blurb,
+    photoId,
   );
   @override
   bool operator ==(Object other) =>
@@ -2091,7 +2441,8 @@ class RoundupCard extends DataClass implements Insertable<RoundupCard> {
           other.discussionUrl == this.discussionUrl &&
           other.excerpt == this.excerpt &&
           other.author == this.author &&
-          other.blurb == this.blurb);
+          other.blurb == this.blurb &&
+          other.photoId == this.photoId);
 }
 
 class RoundupCardsCompanion extends UpdateCompanion<RoundupCard> {
@@ -2106,6 +2457,7 @@ class RoundupCardsCompanion extends UpdateCompanion<RoundupCard> {
   final Value<String> excerpt;
   final Value<String> author;
   final Value<String> blurb;
+  final Value<String?> photoId;
   const RoundupCardsCompanion({
     this.id = const Value.absent(),
     this.issueId = const Value.absent(),
@@ -2118,6 +2470,7 @@ class RoundupCardsCompanion extends UpdateCompanion<RoundupCard> {
     this.excerpt = const Value.absent(),
     this.author = const Value.absent(),
     this.blurb = const Value.absent(),
+    this.photoId = const Value.absent(),
   });
   RoundupCardsCompanion.insert({
     this.id = const Value.absent(),
@@ -2131,6 +2484,7 @@ class RoundupCardsCompanion extends UpdateCompanion<RoundupCard> {
     this.excerpt = const Value.absent(),
     this.author = const Value.absent(),
     this.blurb = const Value.absent(),
+    this.photoId = const Value.absent(),
   }) : issueId = Value(issueId),
        position = Value(position),
        type = Value(type);
@@ -2146,6 +2500,7 @@ class RoundupCardsCompanion extends UpdateCompanion<RoundupCard> {
     Expression<String>? excerpt,
     Expression<String>? author,
     Expression<String>? blurb,
+    Expression<String>? photoId,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2159,6 +2514,7 @@ class RoundupCardsCompanion extends UpdateCompanion<RoundupCard> {
       if (excerpt != null) 'excerpt': excerpt,
       if (author != null) 'author': author,
       if (blurb != null) 'blurb': blurb,
+      if (photoId != null) 'photo_id': photoId,
     });
   }
 
@@ -2174,6 +2530,7 @@ class RoundupCardsCompanion extends UpdateCompanion<RoundupCard> {
     Value<String>? excerpt,
     Value<String>? author,
     Value<String>? blurb,
+    Value<String?>? photoId,
   }) {
     return RoundupCardsCompanion(
       id: id ?? this.id,
@@ -2187,6 +2544,7 @@ class RoundupCardsCompanion extends UpdateCompanion<RoundupCard> {
       excerpt: excerpt ?? this.excerpt,
       author: author ?? this.author,
       blurb: blurb ?? this.blurb,
+      photoId: photoId ?? this.photoId,
     );
   }
 
@@ -2226,6 +2584,9 @@ class RoundupCardsCompanion extends UpdateCompanion<RoundupCard> {
     if (blurb.present) {
       map['blurb'] = Variable<String>(blurb.value);
     }
+    if (photoId.present) {
+      map['photo_id'] = Variable<String>(photoId.value);
+    }
     return map;
   }
 
@@ -2242,7 +2603,8 @@ class RoundupCardsCompanion extends UpdateCompanion<RoundupCard> {
           ..write('discussionUrl: $discussionUrl, ')
           ..write('excerpt: $excerpt, ')
           ..write('author: $author, ')
-          ..write('blurb: $blurb')
+          ..write('blurb: $blurb, ')
+          ..write('photoId: $photoId')
           ..write(')'))
         .toString();
   }
@@ -2810,6 +3172,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $BookmarksTableTable bookmarksTable = $BookmarksTableTable(this);
   late final $RoundupIssuesTable roundupIssues = $RoundupIssuesTable(this);
+  late final $RoundupPhotosTable roundupPhotos = $RoundupPhotosTable(this);
   late final $RoundupCardsTable roundupCards = $RoundupCardsTable(this);
   late final $CommentExportsTable commentExports = $CommentExportsTable(this);
   @override
@@ -2819,6 +3182,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     bookmarksTable,
     roundupIssues,
+    roundupPhotos,
     roundupCards,
     commentExports,
   ];
@@ -3693,6 +4057,304 @@ typedef $$RoundupIssuesTableProcessedTableManager =
       RoundupIssue,
       PrefetchHooks Function({bool roundupCardsRefs})
     >;
+typedef $$RoundupPhotosTableCreateCompanionBuilder =
+    RoundupPhotosCompanion Function({
+      required String id,
+      required Uint8List bytes,
+      required int width,
+      required int height,
+      Value<int> rowid,
+    });
+typedef $$RoundupPhotosTableUpdateCompanionBuilder =
+    RoundupPhotosCompanion Function({
+      Value<String> id,
+      Value<Uint8List> bytes,
+      Value<int> width,
+      Value<int> height,
+      Value<int> rowid,
+    });
+
+final class $$RoundupPhotosTableReferences
+    extends BaseReferences<_$AppDatabase, $RoundupPhotosTable, RoundupPhoto> {
+  $$RoundupPhotosTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<$RoundupCardsTable, List<RoundupCard>>
+  _roundupCardsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.roundupCards,
+    aliasName: $_aliasNameGenerator(
+      db.roundupPhotos.id,
+      db.roundupCards.photoId,
+    ),
+  );
+
+  $$RoundupCardsTableProcessedTableManager get roundupCardsRefs {
+    final manager = $$RoundupCardsTableTableManager(
+      $_db,
+      $_db.roundupCards,
+    ).filter((f) => f.photoId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_roundupCardsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$RoundupPhotosTableFilterComposer
+    extends Composer<_$AppDatabase, $RoundupPhotosTable> {
+  $$RoundupPhotosTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get bytes => $composableBuilder(
+    column: $table.bytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get width => $composableBuilder(
+    column: $table.width,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get height => $composableBuilder(
+    column: $table.height,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> roundupCardsRefs(
+    Expression<bool> Function($$RoundupCardsTableFilterComposer f) f,
+  ) {
+    final $$RoundupCardsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.roundupCards,
+      getReferencedColumn: (t) => t.photoId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoundupCardsTableFilterComposer(
+            $db: $db,
+            $table: $db.roundupCards,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$RoundupPhotosTableOrderingComposer
+    extends Composer<_$AppDatabase, $RoundupPhotosTable> {
+  $$RoundupPhotosTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get bytes => $composableBuilder(
+    column: $table.bytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get width => $composableBuilder(
+    column: $table.width,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get height => $composableBuilder(
+    column: $table.height,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RoundupPhotosTableAnnotationComposer
+    extends Composer<_$AppDatabase, $RoundupPhotosTable> {
+  $$RoundupPhotosTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get bytes =>
+      $composableBuilder(column: $table.bytes, builder: (column) => column);
+
+  GeneratedColumn<int> get width =>
+      $composableBuilder(column: $table.width, builder: (column) => column);
+
+  GeneratedColumn<int> get height =>
+      $composableBuilder(column: $table.height, builder: (column) => column);
+
+  Expression<T> roundupCardsRefs<T extends Object>(
+    Expression<T> Function($$RoundupCardsTableAnnotationComposer a) f,
+  ) {
+    final $$RoundupCardsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.roundupCards,
+      getReferencedColumn: (t) => t.photoId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoundupCardsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.roundupCards,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$RoundupPhotosTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $RoundupPhotosTable,
+          RoundupPhoto,
+          $$RoundupPhotosTableFilterComposer,
+          $$RoundupPhotosTableOrderingComposer,
+          $$RoundupPhotosTableAnnotationComposer,
+          $$RoundupPhotosTableCreateCompanionBuilder,
+          $$RoundupPhotosTableUpdateCompanionBuilder,
+          (RoundupPhoto, $$RoundupPhotosTableReferences),
+          RoundupPhoto,
+          PrefetchHooks Function({bool roundupCardsRefs})
+        > {
+  $$RoundupPhotosTableTableManager(_$AppDatabase db, $RoundupPhotosTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () => $$RoundupPhotosTableFilterComposer($db: db, $table: table),
+          createOrderingComposer:
+              () =>
+                  $$RoundupPhotosTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer:
+              () => $$RoundupPhotosTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<Uint8List> bytes = const Value.absent(),
+                Value<int> width = const Value.absent(),
+                Value<int> height = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RoundupPhotosCompanion(
+                id: id,
+                bytes: bytes,
+                width: width,
+                height: height,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required Uint8List bytes,
+                required int width,
+                required int height,
+                Value<int> rowid = const Value.absent(),
+              }) => RoundupPhotosCompanion.insert(
+                id: id,
+                bytes: bytes,
+                width: width,
+                height: height,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          $$RoundupPhotosTableReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: ({roundupCardsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (roundupCardsRefs) db.roundupCards],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (roundupCardsRefs)
+                    await $_getPrefetchedData<
+                      RoundupPhoto,
+                      $RoundupPhotosTable,
+                      RoundupCard
+                    >(
+                      currentTable: table,
+                      referencedTable: $$RoundupPhotosTableReferences
+                          ._roundupCardsRefsTable(db),
+                      managerFromTypedResult:
+                          (p0) =>
+                              $$RoundupPhotosTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).roundupCardsRefs,
+                      referencedItemsForCurrentItem:
+                          (item, referencedItems) => referencedItems.where(
+                            (e) => e.photoId == item.id,
+                          ),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$RoundupPhotosTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $RoundupPhotosTable,
+      RoundupPhoto,
+      $$RoundupPhotosTableFilterComposer,
+      $$RoundupPhotosTableOrderingComposer,
+      $$RoundupPhotosTableAnnotationComposer,
+      $$RoundupPhotosTableCreateCompanionBuilder,
+      $$RoundupPhotosTableUpdateCompanionBuilder,
+      (RoundupPhoto, $$RoundupPhotosTableReferences),
+      RoundupPhoto,
+      PrefetchHooks Function({bool roundupCardsRefs})
+    >;
 typedef $$RoundupCardsTableCreateCompanionBuilder =
     RoundupCardsCompanion Function({
       Value<int> id,
@@ -3706,6 +4368,7 @@ typedef $$RoundupCardsTableCreateCompanionBuilder =
       Value<String> excerpt,
       Value<String> author,
       Value<String> blurb,
+      Value<String?> photoId,
     });
 typedef $$RoundupCardsTableUpdateCompanionBuilder =
     RoundupCardsCompanion Function({
@@ -3720,6 +4383,7 @@ typedef $$RoundupCardsTableUpdateCompanionBuilder =
       Value<String> excerpt,
       Value<String> author,
       Value<String> blurb,
+      Value<String?> photoId,
     });
 
 final class $$RoundupCardsTableReferences
@@ -3739,6 +4403,25 @@ final class $$RoundupCardsTableReferences
       $_db.roundupIssues,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_issueIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $RoundupPhotosTable _photoIdTable(_$AppDatabase db) =>
+      db.roundupPhotos.createAlias(
+        $_aliasNameGenerator(db.roundupCards.photoId, db.roundupPhotos.id),
+      );
+
+  $$RoundupPhotosTableProcessedTableManager? get photoId {
+    final $_column = $_itemColumn<String>('photo_id');
+    if ($_column == null) return null;
+    final manager = $$RoundupPhotosTableTableManager(
+      $_db,
+      $_db.roundupPhotos,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_photoIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -3819,6 +4502,29 @@ class $$RoundupCardsTableFilterComposer
           }) => $$RoundupIssuesTableFilterComposer(
             $db: $db,
             $table: $db.roundupIssues,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$RoundupPhotosTableFilterComposer get photoId {
+    final $$RoundupPhotosTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.photoId,
+      referencedTable: $db.roundupPhotos,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoundupPhotosTableFilterComposer(
+            $db: $db,
+            $table: $db.roundupPhotos,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -3910,6 +4616,29 @@ class $$RoundupCardsTableOrderingComposer
     );
     return composer;
   }
+
+  $$RoundupPhotosTableOrderingComposer get photoId {
+    final $$RoundupPhotosTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.photoId,
+      referencedTable: $db.roundupPhotos,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoundupPhotosTableOrderingComposer(
+            $db: $db,
+            $table: $db.roundupPhotos,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$RoundupCardsTableAnnotationComposer
@@ -3977,6 +4706,29 @@ class $$RoundupCardsTableAnnotationComposer
     );
     return composer;
   }
+
+  $$RoundupPhotosTableAnnotationComposer get photoId {
+    final $$RoundupPhotosTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.photoId,
+      referencedTable: $db.roundupPhotos,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoundupPhotosTableAnnotationComposer(
+            $db: $db,
+            $table: $db.roundupPhotos,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$RoundupCardsTableTableManager
@@ -3992,7 +4744,7 @@ class $$RoundupCardsTableTableManager
           $$RoundupCardsTableUpdateCompanionBuilder,
           (RoundupCard, $$RoundupCardsTableReferences),
           RoundupCard,
-          PrefetchHooks Function({bool issueId})
+          PrefetchHooks Function({bool issueId, bool photoId})
         > {
   $$RoundupCardsTableTableManager(_$AppDatabase db, $RoundupCardsTable table)
     : super(
@@ -4019,6 +4771,7 @@ class $$RoundupCardsTableTableManager
                 Value<String> excerpt = const Value.absent(),
                 Value<String> author = const Value.absent(),
                 Value<String> blurb = const Value.absent(),
+                Value<String?> photoId = const Value.absent(),
               }) => RoundupCardsCompanion(
                 id: id,
                 issueId: issueId,
@@ -4031,6 +4784,7 @@ class $$RoundupCardsTableTableManager
                 excerpt: excerpt,
                 author: author,
                 blurb: blurb,
+                photoId: photoId,
               ),
           createCompanionCallback:
               ({
@@ -4045,6 +4799,7 @@ class $$RoundupCardsTableTableManager
                 Value<String> excerpt = const Value.absent(),
                 Value<String> author = const Value.absent(),
                 Value<String> blurb = const Value.absent(),
+                Value<String?> photoId = const Value.absent(),
               }) => RoundupCardsCompanion.insert(
                 id: id,
                 issueId: issueId,
@@ -4057,6 +4812,7 @@ class $$RoundupCardsTableTableManager
                 excerpt: excerpt,
                 author: author,
                 blurb: blurb,
+                photoId: photoId,
               ),
           withReferenceMapper:
               (p0) =>
@@ -4068,7 +4824,7 @@ class $$RoundupCardsTableTableManager
                         ),
                       )
                       .toList(),
-          prefetchHooksCallback: ({issueId = false}) {
+          prefetchHooksCallback: ({issueId = false, photoId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
@@ -4101,6 +4857,20 @@ class $$RoundupCardsTableTableManager
                           )
                           as T;
                 }
+                if (photoId) {
+                  state =
+                      state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.photoId,
+                            referencedTable: $$RoundupCardsTableReferences
+                                ._photoIdTable(db),
+                            referencedColumn:
+                                $$RoundupCardsTableReferences
+                                    ._photoIdTable(db)
+                                    .id,
+                          )
+                          as T;
+                }
 
                 return state;
               },
@@ -4125,7 +4895,7 @@ typedef $$RoundupCardsTableProcessedTableManager =
       $$RoundupCardsTableUpdateCompanionBuilder,
       (RoundupCard, $$RoundupCardsTableReferences),
       RoundupCard,
-      PrefetchHooks Function({bool issueId})
+      PrefetchHooks Function({bool issueId, bool photoId})
     >;
 typedef $$CommentExportsTableCreateCompanionBuilder =
     CommentExportsCompanion Function({
@@ -4426,6 +5196,8 @@ class $AppDatabaseManager {
       $$BookmarksTableTableTableManager(_db, _db.bookmarksTable);
   $$RoundupIssuesTableTableManager get roundupIssues =>
       $$RoundupIssuesTableTableManager(_db, _db.roundupIssues);
+  $$RoundupPhotosTableTableManager get roundupPhotos =>
+      $$RoundupPhotosTableTableManager(_db, _db.roundupPhotos);
   $$RoundupCardsTableTableManager get roundupCards =>
       $$RoundupCardsTableTableManager(_db, _db.roundupCards);
   $$CommentExportsTableTableManager get commentExports =>

@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../core/utils/content_utils.dart';
@@ -230,6 +232,8 @@ class GitHubService {
     required String branch,
     required String content,
     String? expectedSha,
+    List<GitHubAsset> assets = const [],
+    void Function(int done, int total)? onPhotoProgress,
   }) async {
     final endpoint = '/repos/$repo/contents/${_path(path)}';
     Map<String, dynamic>? existing;
@@ -240,14 +244,13 @@ class GitHubService {
       if (e.response?.statusCode != 404) rethrow;
     }
     final sha = existing?['sha'] as String?;
+    var unchanged = false;
     if (existing != null) {
       final old = utf8.decode(
         base64Decode((existing['content'] as String).replaceAll('\n', '')),
       );
-      if (old == content) {
-        return GitHubPublication(sha!, existing['html_url'] as String? ?? '');
-      }
-      if (expectedSha == null || expectedSha != sha) {
+      unchanged = old == content;
+      if (!unchanged && (expectedSha == null || expectedSha != sha)) {
         throw StateError(
           'This file already exists or changed on GitHub. Your local draft is safe. Resolve the remote change before updating.',
         );
@@ -256,6 +259,16 @@ class GitHubService {
       throw StateError(
         'The published file was removed on GitHub. Your local draft is safe.',
       );
+    }
+    // Publish references only after every image is available. Uploads are
+    // immutable and idempotent, so a failed batch can be retried safely.
+    for (var i = 0; i < assets.length; i++) {
+      onPhotoProgress?.call(i, assets.length);
+      await _uploadAsset(repo, branch, assets[i]);
+    }
+    if (assets.isNotEmpty) onPhotoProgress?.call(assets.length, assets.length);
+    if (unchanged) {
+      return GitHubPublication(sha!, existing!['html_url'] as String? ?? '');
     }
     final response = await _dio.put(
       endpoint,
@@ -273,6 +286,47 @@ class GitHubService {
       file['sha'] as String,
       file['html_url'] as String? ?? '',
     );
+  }
+
+  Future<void> _uploadAsset(
+    String repo,
+    String branch,
+    GitHubAsset asset,
+  ) async {
+    final endpoint = '/repos/$repo/contents/${_path(asset.path)}';
+    final expected =
+        sha1.convert([
+          ...utf8.encode('blob ${asset.bytes.length}\u0000'),
+          ...asset.bytes,
+        ]).toString();
+    Future<bool> exists() async {
+      try {
+        final response = await _get(endpoint, query: {'ref': branch});
+        if ((response.data as Map)['sha'] == expected) return true;
+        throw StateError(
+          'An image at this destination changed on GitHub. Your local photo is safe.',
+        );
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404) return false;
+        rethrow;
+      }
+    }
+
+    if (await exists()) return;
+    try {
+      await _dio.put(
+        endpoint,
+        options: _auth(await _token()),
+        data: {
+          'message': 'Add roundup photo',
+          'branch': branch,
+          'content': base64Encode(asset.bytes),
+        },
+      );
+    } on DioException catch (e) {
+      if ([409, 422].contains(e.response?.statusCode) && await exists()) return;
+      rethrow;
+    }
   }
 
   Future<bool> isLive(String url, String issueId, int revision) async {
@@ -315,6 +369,12 @@ class GitHubContentItem {
 class GitHubPublication {
   final String sha, fileUrl;
   const GitHubPublication(this.sha, this.fileUrl);
+}
+
+class GitHubAsset {
+  final String path;
+  final Uint8List bytes;
+  const GitHubAsset(this.path, this.bytes);
 }
 
 String friendlyGitHubError(Object error) {

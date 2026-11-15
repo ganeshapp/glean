@@ -56,6 +56,17 @@ class RoundupCards extends Table {
   TextColumn get excerpt => text().withDefault(const Constant(''))();
   TextColumn get author => text().withDefault(const Constant(''))();
   TextColumn get blurb => text().withDefault(const Constant(''))();
+  TextColumn get photoId => text().nullable().references(RoundupPhotos, #id)();
+}
+
+@DataClassName('RoundupPhoto')
+class RoundupPhotos extends Table {
+  TextColumn get id => text()();
+  BlobColumn get bytes => blob()();
+  IntColumn get width => integer()();
+  IntColumn get height => integer()();
+  @override
+  Set<Column> get primaryKey => {id};
 }
 
 @DataClassName('CommentExport')
@@ -74,14 +85,20 @@ class CommentExports extends Table {
 }
 
 @DriftDatabase(
-  tables: [BookmarksTable, RoundupIssues, RoundupCards, CommentExports],
+  tables: [
+    BookmarksTable,
+    RoundupIssues,
+    RoundupCards,
+    CommentExports,
+    RoundupPhotos,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -93,6 +110,11 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(roundupIssues);
         await m.createTable(roundupCards);
         await m.createTable(commentExports);
+      }
+      if (from < 3) {
+        await m.createTable(roundupPhotos);
+        // A v1 upgrade creates the current cards table above, including photoId.
+        if (from >= 2) await m.addColumn(roundupCards, roundupCards.photoId);
       }
     },
     beforeOpen: (_) async {

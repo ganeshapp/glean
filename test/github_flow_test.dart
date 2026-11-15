@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -192,6 +193,91 @@ void main() {
       expect(
         await const FlutterSecureStorage().read(key: 'github_pat'),
         isNull,
+      );
+    },
+  );
+  test(
+    'photo upload failure blocks Markdown; retry skips existing photos before publishing',
+    () async {
+      final uploaded = <String, String>{};
+      final puts = <String>[];
+      var fail = true;
+      final first = Uint8List.fromList([1, 2, 3]),
+          second = Uint8List.fromList([4, 5]);
+      String blob(Uint8List bytes) =>
+          sha1.convert([
+            ...utf8.encode('blob ${bytes.length}\u0000'),
+            ...bytes,
+          ]).toString();
+      final api = GitHubService(
+        dio: client((r) async {
+          final name = r.path.split('/').last;
+          if (r.method == 'GET') {
+            expect(r.queryParameters['ref'], 'main');
+            if (!uploaded.containsKey(name)) return json({}, 404);
+            return json({
+              'sha': uploaded[name],
+              if (name == 'issue.md')
+                'content': base64Encode(utf8.encode('Markdown')),
+            });
+          }
+          puts.add(name);
+          if (name == 'two.jpg' && fail) return json({}, 503);
+          if (name.endsWith('.jpg')) {
+            expect((r.data as Map).containsKey('sha'), false);
+            final bytes = base64Decode(r.data['content']);
+            uploaded[name] = blob(bytes);
+          } else {
+            expect(uploaded.keys, containsAll(['one.jpg', 'two.jpg']));
+            uploaded[name] = 'markdown-sha';
+          }
+          return json({
+            'content': {'sha': uploaded[name]},
+          }, 201);
+        }),
+      );
+      Future<GitHubPublication> publish() => api.publish(
+        repo: 'owner/site',
+        path: '_roundup/issue.md',
+        branch: 'main',
+        content: 'Markdown',
+        assets: [
+          GitHubAsset('_roundup/assets/one.jpg', first),
+          GitHubAsset('_roundup/assets/two.jpg', second),
+        ],
+      );
+      await expectLater(publish(), throwsA(isA<DioException>()));
+      expect(uploaded.keys, ['one.jpg']);
+      expect(puts, ['one.jpg', 'two.jpg']);
+      fail = false;
+      expect((await publish()).sha, 'markdown-sha');
+      expect(puts, ['one.jpg', 'two.jpg', 'two.jpg', 'issue.md']);
+      await publish();
+      expect(puts.length, 4);
+    },
+  );
+  test(
+    'conflicting photo is never overwritten or referenced in a new issue',
+    () async {
+      final api = GitHubService(
+        dio: client((r) async {
+          expect(r.method, 'GET');
+          return r.path.endsWith('.md')
+              ? json({}, 404)
+              : json({'sha': 'different-binary'});
+        }),
+      );
+      await expectLater(
+        api.publish(
+          repo: 'owner/site',
+          path: '_roundup/issue.md',
+          branch: 'main',
+          content: 'new',
+          assets: [
+            GitHubAsset('_roundup/assets/photo.jpg', Uint8List.fromList([1])),
+          ],
+        ),
+        throwsStateError,
       );
     },
   );
