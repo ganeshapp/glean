@@ -211,7 +211,7 @@ class FeedCategoryDrawer extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Version 1.1.0',
+                  'Version 1.1.1',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 13,

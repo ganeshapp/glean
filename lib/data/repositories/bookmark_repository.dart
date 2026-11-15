@@ -32,6 +32,24 @@ class BookmarkRepository {
     );
   }
 
+  /// Toggle the reader's saved state without discarding notes or roundup cards.
+  Future<({int id, bool isSaved})> toggleHnBookmark(Bookmark bookmark) =>
+      _db.transaction(() async {
+        final hnId = bookmark.hnItemId;
+        if (hnId == null) throw ArgumentError('An HN item ID is required.');
+        final saved =
+            await (_db.select(_db.bookmarksTable)..where(
+              (t) => t.hnItemId.equals(hnId) & t.archived.equals(false),
+            )).get();
+        if (saved.isNotEmpty) {
+          await (_db.update(_db.bookmarksTable)..where(
+            (t) => t.id.isIn(saved.map((b) => b.id)),
+          )).write(const BookmarksTableCompanion(archived: Value(true)));
+          return (id: saved.first.id, isSaved: false);
+        }
+        return (id: await addBookmark(bookmark), isSaved: true);
+      });
+
   Future<int> addBookmark(Bookmark bookmark) => _db.transaction(() async {
     final key =
         bookmark.type == BookmarkType.hnComment

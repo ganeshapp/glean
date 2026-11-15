@@ -11,7 +11,7 @@ class SaveActions {
     BuildContext context,
     WidgetRef ref,
     HnStory story,
-  ) => save(
+  ) => toggle(
     context,
     ref,
     Bookmark(
@@ -23,20 +23,47 @@ class SaveActions {
       domain: story.domain,
     ),
   );
-  static Future<void> save(
+  static Future<void> toggle(
     BuildContext context,
     WidgetRef ref,
     Bookmark bookmark,
   ) async {
     try {
-      final id = await ref
-          .read(bookmarkRepositoryProvider)
-          .addBookmark(bookmark);
-      if (context.mounted) receipt(context, ref, id);
+      final repo = ref.read(bookmarkRepositoryProvider);
+      final result = await repo.toggleHnBookmark(bookmark);
+      if (!context.mounted) return;
+      if (result.isSaved) {
+        receipt(context, ref, result.id);
+      } else {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Removed from saved'),
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () async {
+                try {
+                  await repo.archive(result.id, false);
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Could not restore. Please try again.'),
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+          ),
+        );
+      }
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not save. Please try again.')),
+          const SnackBar(
+            content: Text('Could not update saved item. Please try again.'),
+          ),
         );
       }
     }

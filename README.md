@@ -4,7 +4,7 @@ An Android Hacker News reader and personal reading library that turns saved link
 
 ## The workflow
 
-1. **Read:** browse HN, search, open discussions, and save directly from a story or comment. Share links or selected text from another Android app into Glean. Capture saves locally first; titles and other metadata load afterward.
+1. **Read:** browse HN, search, open discussions, and save directly from a story or comment. Tap a saved article’s bookmark again, or choose **Remove saved comment** in a comment’s long-press menu, to unsave. Removed items stay in Archived with their notes, and Undo restores them. Share links or selected text from another Android app into Glean. Capture saves locally first; titles and other metadata load afterward.
 2. **Saved:** search the library, add a private thought, archive with undo, and include items in this week's draft. Notes autosave. Saving a known HN item or canonical URL reuses the existing bookmark.
 3. **This week:** add saved items, drag cards into any order, and tap a card to edit its public text, quote, attribution, or source link. Articles, quotes, videos, and web links can be interleaved. There are no mandatory content sections.
 4. Edit the issue title and optional opening, read the rendered preview, and publish. Glean generates Markdown; no Markdown editor is required. Private notes only become public when you explicitly copy them into a card.

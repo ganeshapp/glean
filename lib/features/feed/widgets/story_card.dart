@@ -35,6 +35,7 @@ class StoryCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isBookmarked = ref.watch(isItemBookmarkedProvider(story.id));
     return InkWell(
       onTap: _openArticle,
       child: Padding(
@@ -77,11 +78,10 @@ class StoryCard extends ConsumerWidget {
             Column(
               children: [
                 IconButton(
-                  tooltip: 'Save article',
+                  tooltip:
+                      isBookmarked ? 'Remove saved article' : 'Save article',
                   icon: Icon(
-                    ref.watch(isItemBookmarkedProvider(story.id))
-                        ? Icons.bookmark
-                        : Icons.bookmark_border,
+                    isBookmarked ? Icons.bookmark : Icons.bookmark_border,
                   ),
                   onPressed: () => SaveActions.story(context, ref, story),
                 ),

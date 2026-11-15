@@ -182,7 +182,7 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
   }
 
   void _toggleCommentBookmark(CommentNode node) async {
-    await SaveActions.save(
+    await SaveActions.toggle(
       context,
       ref,
       Bookmark(
@@ -253,6 +253,7 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
                 onPressed: () => _openUrl(HnConstants.itemUrl(widget.storyId)),
               ),
               IconButton(
+                tooltip: isBookmarked ? 'Remove saved article' : 'Save article',
                 icon: Icon(
                   isBookmarked ? Icons.bookmark : Icons.bookmark_border,
                 ),
@@ -365,6 +366,11 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
             onLongPress: () {
               showModalBottomSheet(
                 context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * .85,
+                ),
                 builder:
                     (_) => CommentActionsSheet(
                       comment: node.comment,

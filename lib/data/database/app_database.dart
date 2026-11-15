@@ -151,7 +151,9 @@ class AppDatabase extends _$AppDatabase {
   Future<bool> isBookmarked(int hnItemId) async {
     final result =
         await (select(bookmarksTable)
-              ..where((t) => t.hnItemId.equals(hnItemId))
+              ..where(
+                (t) => t.hnItemId.equals(hnItemId) & t.archived.equals(false),
+              )
               ..limit(1))
             .get();
     return result.isNotEmpty;
