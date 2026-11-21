@@ -18,3 +18,13 @@ final issueCardsProvider = StreamProvider.family<List<RoundupCard>, String>(
 final issuesProvider = StreamProvider(
   (ref) => ref.watch(roundupRepositoryProvider).watchIssues(),
 );
+
+final currentWeekCardsProvider = Provider<AsyncValue<List<RoundupCard>>>((ref) {
+  return ref
+      .watch(currentIssueProvider)
+      .when(
+        data: (issue) => ref.watch(issueCardsProvider(issue.id)),
+        loading: () => const AsyncLoading(),
+        error: (error, stack) => AsyncError(error, stack),
+      );
+});

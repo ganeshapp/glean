@@ -256,11 +256,118 @@ void main() {
       final existing = await legacy.getAllBookmarks();
       expect(existing.single.summary, 'Existing note');
       expect(existing.single.publishedWeek, '202645');
-      expect(existing.single.archived, isFalse);
+      expect(existing.single.archived, isTrue);
       final draft = await RoundupRepository(legacy).ensureWeek();
       expect(draft.publishedAt, isNull);
     } finally {
       await legacy.close();
     }
   });
+  test(
+    'only successfully published snapshot saves are archived; notes and drafts survive',
+    () async {
+      final issue = await issues.ensureWeek();
+      final ids = <int>[];
+      for (var i = 0; i < 3; i++) {
+        ids.add(
+          await saved.addBookmark(
+            Bookmark(
+              type: BookmarkType.website,
+              title: 'Item $i',
+              contentUrl: 'https://example.com/$i',
+              summary: 'Private note $i',
+            ),
+          ),
+        );
+      }
+      for (final id in ids.take(2)) {
+        await issues.include(issue.id, (await saved.get(id))!);
+      }
+      final snapshot = await issues.snapshot(issue.id);
+      // A failed upload never calls recordPublication and leaves all saves active.
+      expect(
+        (await saved.getAll()).every((b) => !b.archived && !b.isPublished),
+        true,
+      );
+      await issues.include(issue.id, (await saved.get(ids.last))!);
+      await issues.recordPublication(
+        snapshot.issue,
+        snapshot.cards,
+        'uploaded',
+      );
+      for (final id in ids.take(2)) {
+        final b = (await saved.get(id))!;
+        expect(b.archived, true);
+        expect(b.isPublished, true);
+        expect(b.publishedWeek, issue.id);
+        expect(b.summary, startsWith('Private note'));
+      }
+      expect((await saved.get(ids.last))!.archived, false);
+      expect((await saved.get(ids.last))!.isPublished, false);
+      expect((await issues.cards(issue.id)).length, 3);
+      expect(
+        (await issues.getIssue(issue.id)).publishedRevision,
+        snapshot.issue.revision,
+      );
+      await issues.recordPublication(
+        snapshot.issue,
+        snapshot.cards,
+        'uploaded',
+      );
+      await saved.archive(ids.first, false);
+      expect((await saved.get(ids.first))!.archived, false);
+      expect((await saved.get(ids.first))!.isPublished, true);
+    },
+  );
+  test(
+    'v3 upgrade archives old published saves without changing notes or roundups',
+    () async {
+      final temp = await Directory.systemTemp.createTemp('glean-v3-upgrade');
+      addTearDown(() => temp.delete(recursive: true));
+      await db.close();
+      db = AppDatabase.forTesting(
+        NativeDatabase(File('${temp.path}/library.db')),
+      );
+      final oldSaved = BookmarkRepository(db),
+          oldIssues = RoundupRepository(db);
+      final issue = await oldIssues.ensureWeek();
+      final published = await oldSaved.addBookmark(
+        Bookmark(
+          type: BookmarkType.website,
+          contentUrl: 'https://example.com/published',
+          summary: 'Keep this note',
+        ),
+      );
+      final pending = await oldSaved.addBookmark(
+        Bookmark(
+          type: BookmarkType.website,
+          contentUrl: 'https://example.com/pending',
+        ),
+      );
+      await oldIssues.include(issue.id, (await oldSaved.get(published))!);
+      final snap = await oldIssues.snapshot(issue.id);
+      await oldIssues.recordPublication(snap.issue, snap.cards, 'remote-sha');
+      await oldSaved.archive(
+        published,
+        false,
+      ); // v1.2.0 left published saves here.
+      await db.customStatement('PRAGMA user_version = 3');
+      await db.close();
+      db = AppDatabase.forTesting(
+        NativeDatabase(File('${temp.path}/library.db')),
+      );
+      final upgraded = BookmarkRepository(db);
+      expect((await upgraded.get(published))!.archived, true);
+      expect((await upgraded.get(published))!.summary, 'Keep this note');
+      expect((await upgraded.get(pending))!.archived, false);
+      expect(
+        (await RoundupRepository(db).getIssue(issue.id)).remoteSha,
+        'remote-sha',
+      );
+      expect(
+        (await RoundupRepository(db).cards(issue.id)).single.bookmarkId,
+        published,
+      );
+    },
+  );
 }

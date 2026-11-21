@@ -98,7 +98,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -115,6 +115,13 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(roundupPhotos);
         // A v1 upgrade creates the current cards table above, including photoId.
         if (from >= 2) await m.addColumn(roundupCards, roundupCards.photoId);
+      }
+      if (from < 4) {
+        // Already-published saves move out of the inbox on upgrade, while
+        // private notes and the editable roundup snapshots remain intact.
+        await customStatement(
+          'UPDATE bookmarks_table SET archived = 1 WHERE is_published = 1',
+        );
       }
     },
     beforeOpen: (_) async {
@@ -161,6 +168,7 @@ class AppDatabase extends _$AppDatabase {
     return (update(bookmarksTable)..where((t) => t.id.isIn(ids))).write(
       BookmarksTableCompanion(
         isPublished: const Value(true),
+        archived: const Value(true),
         publishedWeek: Value(weekLabel),
       ),
     );

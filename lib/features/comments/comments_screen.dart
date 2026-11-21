@@ -142,6 +142,7 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
           (ctx) => AlertDialog(
             title: const Text('Reply'),
             content: TextField(
+              textCapitalization: TextCapitalization.sentences,
               controller: controller,
               maxLines: 5,
               decoration: const InputDecoration(

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/theme/roundup_markdown_style.dart';
+import '../../widgets/editor_text_field.dart';
 import '../../core/utils/content_utils.dart';
 import '../../core/utils/markdown_generator.dart';
 import '../../core/utils/week_utils.dart';
@@ -434,13 +436,13 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextField(
+                  EditorTextField(
                     controller: title,
                     maxLines: null,
                     decoration: const InputDecoration(labelText: 'Title'),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
+                  EditorTextField(
                     controller: intro,
                     minLines: 3,
                     maxLines: 8,
@@ -650,6 +652,7 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
           (_) => Scaffold(
             appBar: AppBar(title: const Text('Reader preview')),
             body: Markdown(
+              styleSheet: roundupMarkdownStyle(Theme.of(context)),
               data:
                   '# ${MarkdownGenerator.text(issue.title)}\n\n${MarkdownGenerator.body(issue, cards, forPreview: true)}',
               selectable: true,
@@ -696,7 +699,7 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
                   : 'Update this roundup?',
             ),
             content: Text(
-              '${entries.length} cards and their public text will be published to your configured website. Your private saved notes are excluded.',
+              '${entries.length} cards and their public text will be published to your configured website. Published saved items will move to Archived, where you can restore them. Your private saved notes are excluded.',
             ),
             actions: [
               TextButton(
@@ -774,7 +777,7 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
         setState(
           () =>
               message =
-                  'Uploaded to GitHub. The website may take a moment to rebuild.',
+                  'Uploaded to GitHub. Published saved items are now in Archived. The website may take a moment to rebuild.',
         );
       }
     } catch (e) {
@@ -865,13 +868,14 @@ class _RoundupCardEditorState extends ConsumerState<RoundupCardEditor> {
   bool saving = false, dirty = false;
   int generation = 0;
   late RoundupCard persisted = widget.card;
+  late RoundupCard queued = widget.card;
   Future<void> writes = Future.value();
   @override
   void initState() {
     super.initState();
     loadThought();
     for (final c in [title, url, excerpt, author, blurb]) {
-      c.addListener(saveChange);
+      c.addListener(() => saveChange());
     }
   }
 
@@ -883,8 +887,7 @@ class _RoundupCardEditorState extends ConsumerState<RoundupCardEditor> {
     if (mounted) setState(() => savedThought = b?.summary);
   }
 
-  void saveChange() {
-    final run = ++generation;
+  void saveChange({bool retry = false}) {
     final snapshot = widget.card.copyWith(
       title: title.text,
       url: url.text,
@@ -892,6 +895,10 @@ class _RoundupCardEditorState extends ConsumerState<RoundupCardEditor> {
       author: author.text,
       blurb: blurb.text,
     );
+    // Cursor movement and IME composition notifications are not text edits.
+    if (!retry && snapshot == queued) return;
+    queued = snapshot;
+    final run = ++generation;
     final repo = ref.read(roundupRepositoryProvider);
     setState(() {
       saving = true;
@@ -962,7 +969,7 @@ class _RoundupCardEditorState extends ConsumerState<RoundupCardEditor> {
             ListTile(
               title: Text(error!),
               trailing: TextButton(
-                onPressed: saveChange,
+                onPressed: () => saveChange(retry: true),
                 child: const Text('Retry'),
               ),
             ),
@@ -977,7 +984,7 @@ class _RoundupCardEditorState extends ConsumerState<RoundupCardEditor> {
             ),
             const SizedBox(height: 16),
           ],
-          TextField(
+          EditorTextField(
             controller: title,
             maxLines: null,
             decoration: InputDecoration(
@@ -988,7 +995,7 @@ class _RoundupCardEditorState extends ConsumerState<RoundupCardEditor> {
             ),
           ),
           const SizedBox(height: 16),
-          TextField(
+          EditorTextField(
             controller: blurb,
             minLines: 4,
             maxLines: null,
@@ -1008,7 +1015,7 @@ class _RoundupCardEditorState extends ConsumerState<RoundupCardEditor> {
             ),
           const SizedBox(height: 16),
           if (widget.card.type != 'photo') ...[
-            TextField(
+            EditorTextField(
               controller: excerpt,
               minLines: 3,
               maxLines: null,
@@ -1017,16 +1024,17 @@ class _RoundupCardEditorState extends ConsumerState<RoundupCardEditor> {
               ),
             ),
             const SizedBox(height: 16),
-            TextField(
+            EditorTextField(
               controller: author,
               decoration: const InputDecoration(
                 labelText: 'Author / attribution',
               ),
             ),
             const SizedBox(height: 16),
-            TextField(
+            EditorTextField(
               controller: url,
               keyboardType: TextInputType.url,
+              textCapitalization: TextCapitalization.none,
               decoration: const InputDecoration(labelText: 'Source URL'),
             ),
             const SizedBox(height: 24),

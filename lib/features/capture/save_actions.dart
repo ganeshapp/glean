@@ -85,7 +85,7 @@ class SaveActions {
   static Future<void> includeThisWeek(WidgetRef ref, int id) async {
     final b = await ref.read(bookmarkRepositoryProvider).get(id);
     if (b == null) return;
-    final issue = await ref.read(roundupRepositoryProvider).ensureWeek();
+    final issue = await ref.read(currentIssueProvider.future);
     await ref.read(roundupRepositoryProvider).include(issue.id, b);
   }
 }

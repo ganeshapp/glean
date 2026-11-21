@@ -5,9 +5,11 @@ An Android Hacker News reader and personal reading library that turns saved link
 ## The workflow
 
 1. **Read:** browse HN, search, open discussions, and save directly from a story or comment. Tap a saved article’s bookmark again, or choose **Remove saved comment** in a comment’s long-press menu, to unsave. Removed items stay in Archived with their notes, and Undo restores them. Share links or selected text from another Android app into Glean. Capture saves locally first; titles and other metadata load afterward.
-2. **Saved:** search the library, add a private thought, archive with undo, and include items in this week's draft. Notes autosave. Saving a known HN item or canonical URL reuses the existing bookmark.
+2. **Saved:** search the library, add a private thought, archive with undo, and include items in this week's draft. Notes autosave when text changes; cursor movement and selection do not trigger saves. Prose fields request sentence capitalization from your keyboard. A checked **Added this week** button tracks membership in the current draft. Saving a known HN item or canonical URL reuses the existing bookmark.
 3. **This week:** add saved items or select multiple gallery photos, drag cards into any order, and tap a card to edit its public text, quote, attribution, or source link. Articles, quotes, photos, videos, and web links can be interleaved. Each photo is its own card with an optional caption and explanation; use the drag handle or Move up / Move down. There are no mandatory content sections.
 4. Edit the issue title and optional opening, read the rendered preview, and publish. Glean generates Markdown; no Markdown editor is required. Private notes only become public when you explicitly copy them into a card.
+
+After a successful upload, the included saves automatically move to **Archived**. Your notes and editable roundup cards are kept. Use the **Published** filter to find previously published saves, labeled with their issue week; swipe an archived item to restore it to Saved. Failed uploads leave saves in place. On upgrade, items already marked published move to Archived once.
 
 Drafts persist on the phone. Issue history keeps older drafts and published issues available. Publishing again updates the same issue file rather than appending duplicate content. Glean checks the remote file SHA and stops if somebody changed the file independently. An upload confirmation and a live-page check distinguish a GitHub commit from a completed Pages deployment.
 
@@ -51,7 +53,7 @@ Comment long-press actions also include **Copy text** and **Select text…** for
 
 ## Backup and migration
 
-Settings can export or restore a JSON backup of saved items, private notes, ordered drafts, publication history, photos, and completed comment exports. Backups have a 200 MB limit. Restore replaces the local library after confirmation; GitHub credentials stay on the device. Database version 3 preserves existing bookmarks, notes, drafts, and published flags and adds photo storage. Both old version 1 backups and photo-inclusive version 2 backups can be restored. Previously generated Markdown files are left in their existing location and are not imported as editable issues.
+Settings can export or restore a JSON backup of saved items, private notes, ordered drafts, publication history, photos, and completed comment exports. Backups have a 200 MB limit. Restore replaces the local library after confirmation; GitHub credentials stay on the device. Database version 4 preserves existing bookmarks, notes, drafts, and published flags with photo storage and moves previously published saves out of the Saved inbox. Both old version 1 backups and photo-inclusive version 2 backups can be restored. Previously generated Markdown files are left in their existing location and are not imported as editable issues.
 
 ## Development
 
@@ -66,9 +68,11 @@ flutter run
 flutter build apk --release --split-per-abi
 ```
 
+The prose editor includes a narrowly scoped Android touch workaround for [Flutter’s virtual-keyboard Shift selection bug](https://github.com/flutter/flutter/issues/184744). Single touch taps place the caret; long press, double tap, and mouse Shift-selection keep their normal behavior. The shared Flutter SDK is unchanged.
+
 The repository's existing release build configuration uses the local debug signing key. Keep the same signing key when updating an installed build; use a dedicated release keystore for wider distribution.
 
-Tests cover v1/v2 database migrations, photo import/recovery, image normalization, media publishing and upload retries, AI sharing/save formats, persistent mixed ordering, private/public text boundaries, autosave, URL deduplication, backup validation, comment hierarchy and sampling, OAuth polling, safe GitHub updates, and phone layouts. Optional test artifacts:
+Tests cover v1/v2/v3 database migrations, Android touch selection with a stuck Shift modifier, sentence-capitalization input configuration, quote contrast, reactive draft membership, automatic publication archiving, photo import/recovery, image normalization, media publishing and upload retries, AI sharing/save formats, persistent mixed ordering, private/public text boundaries, autosave, URL deduplication, backup validation, comment hierarchy and sampling, OAuth polling, safe GitHub updates, and phone layouts. Optional test artifacts:
 
 ```sh
 GLEAN_SITE_FIXTURE=/tmp/roundup-fixture.md flutter test test/roundup_repository_test.dart

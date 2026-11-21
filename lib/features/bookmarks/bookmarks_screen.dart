@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/database/app_database.dart';
-import '../capture/save_actions.dart';
+import '../capture/include_this_week_button.dart';
 import 'bookmark_provider.dart';
 
 class BookmarksScreen extends ConsumerStatefulWidget {
@@ -45,7 +45,7 @@ class _BookmarksScreenState extends ConsumerState<BookmarksScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children:
-                  ['Saved', 'With thoughts', 'Archived']
+                  ['Saved', 'With thoughts', 'Published', 'Archived']
                       .map(
                         (f) => Padding(
                           padding: const EdgeInsets.only(right: 8),
@@ -70,7 +70,9 @@ class _BookmarksScreenState extends ConsumerState<BookmarksScreen> {
                     all
                         .where(
                           (b) =>
-                              b.archived == (filter == 'Archived') &&
+                              (filter == 'Published'
+                                  ? b.isPublished
+                                  : b.archived == (filter == 'Archived')) &&
                               (filter != 'With thoughts' ||
                                   (b.summary?.isNotEmpty ?? false)) &&
                               [
@@ -96,6 +98,8 @@ class _BookmarksScreenState extends ConsumerState<BookmarksScreen> {
                             ? 'No matches. Try another search.'
                             : filter == 'Archived'
                             ? 'Archived items appear here.'
+                            : filter == 'Published'
+                            ? 'Items from published roundups appear here.'
                             : 'Save from HN or share a link from another app. Add a thought whenever you want.',
                       ),
                     ),
@@ -136,7 +140,7 @@ class _BookmarksScreenState extends ConsumerState<BookmarksScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${typeLabel(b.type)}${b.domain == null ? '' : ' · ${b.domain}'}${b.isPublished ? ' · Published' : ''}',
+                '${typeLabel(b.type)}${b.domain == null ? '' : ' · ${b.domain}'}${b.isPublished ? ' · Published${b.publishedWeek == null ? '' : ' in ${b.publishedWeek}'}' : ''}',
                 style: Theme.of(context).textTheme.labelSmall,
               ),
               const SizedBox(height: 6),
@@ -170,20 +174,7 @@ class _BookmarksScreenState extends ConsumerState<BookmarksScreen> {
                           : 'Add thought',
                     ),
                   ),
-                  TextButton.icon(
-                    onPressed: () async {
-                      await SaveActions.includeThisWeek(ref, b.id);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Included in this week’s draft'),
-                          ),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.playlist_add, size: 18),
-                    label: const Text('This week'),
-                  ),
+                  IncludeThisWeekButton(bookmarkId: b.id),
                 ],
               ),
             ],

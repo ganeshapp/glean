@@ -1,7 +1,7 @@
 name: glean
 description: "Glean - HN Client + Weekly Curation Publisher"
 publish_to: 'none'
-version: 1.2.0+10
+version: 1.2.1+11
 
 environment:
   sdk: ^3.7.2

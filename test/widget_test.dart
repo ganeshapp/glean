@@ -5,6 +5,9 @@ import 'package:glean/features/photos/roundup_photo_view.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:glean/features/bookmarks/bookmarks_screen.dart';
+import 'package:glean/core/theme/roundup_markdown_style.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glean/core/theme/app_theme.dart';
@@ -321,6 +324,155 @@ void main() {
       expect(find.byType(RoundupPhotoView), findsOneWidget);
       expect(find.byType(Image), findsOneWidget);
       await capture(t, 'photo-preview');
+      expect(t.takeException(), isNull);
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(milliseconds: 10));
+      await t.runAsync(() => db.close());
+    },
+  );
+  testWidgets(
+    'Saved immediately reflects draft membership and hides published saves',
+    (t) async {
+      phone(t);
+      final saved = BookmarkRepository(db), repo = RoundupRepository(db);
+      final id = await saved.addBookmark(
+        Bookmark(
+          type: BookmarkType.website,
+          title: 'New candidate',
+          contentUrl: 'https://example.com/new',
+        ),
+      );
+      await t.pumpWidget(host(const BookmarksScreen()));
+      await settle(t);
+      expect(find.text('Added this week'), findsWidgets);
+      final row = find.ancestor(
+        of: find.text('New candidate'),
+        matching: find.byType(Card),
+      );
+      await t.tap(find.descendant(of: row, matching: find.text('This week')));
+      await settle(t);
+      expect(
+        find.descendant(of: row, matching: find.text('Added this week')),
+        findsOneWidget,
+      );
+      expect(
+        (await t.runAsync(
+          () => repo.cards(issue.id),
+        ))!.where((c) => c.bookmarkId == id).length,
+        1,
+      );
+      final snapshot = (await t.runAsync(() => repo.snapshot(issue.id)))!;
+      await t.runAsync(
+        () =>
+            repo.recordPublication(snapshot.issue, snapshot.cards, 'published'),
+      );
+      await settle(t);
+      expect(find.text('New candidate'), findsNothing);
+      await t.tap(find.text('Published'));
+      await settle(t);
+      expect(find.text('New candidate'), findsOneWidget);
+      await capture(t, 'published-library');
+      // Membership also follows removal from the draft instead of sticking forever.
+      final added = snapshot.cards.firstWhere((c) => c.bookmarkId == id);
+      await t.runAsync(() => repo.removeCard(added));
+      await settle(t);
+      final publishedRow = find.ancestor(
+        of: find.text('New candidate'),
+        matching: find.byType(Card),
+      );
+      expect(
+        find.descendant(of: publishedRow, matching: find.text('This week')),
+        findsOneWidget,
+      );
+      expect(t.takeException(), isNull);
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(milliseconds: 10));
+      await t.runAsync(() => db.close());
+    },
+  );
+  testWidgets(
+    'public editor keeps cursor moves out of autosave and preserves selection after saves',
+    (t) async {
+      phone(t);
+      await t.pumpWidget(host(RoundupCardEditor(card: cards.first)));
+      await settle(t);
+      final field = find.byType(TextField).at(1);
+      await t.enterText(
+        field,
+        'First sentence. Second sentence.\nA note with another line.',
+      );
+      await settle(t);
+      final before =
+          (await t.runAsync(
+            () => RoundupRepository(db).getIssue(issue.id),
+          ))!.revision;
+      final controller = t.widget<TextField>(field).controller!;
+      controller.selection = const TextSelection.collapsed(offset: 3);
+      await t.pump();
+      expect(find.text('Saving…'), findsNothing);
+      await settle(t);
+      expect(
+        (await t.runAsync(
+          () => RoundupRepository(db).getIssue(issue.id),
+        ))!.revision,
+        before,
+      );
+      controller.value = controller.value.copyWith(
+        composing: const TextRange(start: 0, end: 5),
+      );
+      await settle(t);
+      expect(
+        (await t.runAsync(
+          () => RoundupRepository(db).getIssue(issue.id),
+        ))!.revision,
+        before,
+      );
+      expect(controller.selection, const TextSelection.collapsed(offset: 3));
+      expect(
+        t.widget<TextField>(field).textCapitalization,
+        TextCapitalization.sentences,
+      );
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(milliseconds: 10));
+      await t.runAsync(() => db.close());
+    },
+  );
+  testWidgets(
+    'reader preview renders quotes with readable dark-theme text and links',
+    (t) async {
+      phone(t);
+      await t.pumpWidget(host(PublishScreen(issueId: issue.id)));
+      await settle(t);
+      await t.tap(find.text('Preview'));
+      await settle(t);
+      final sheet = t.widget<Markdown>(find.byType(Markdown)).styleSheet!;
+      final background = (sheet.blockquoteDecoration! as BoxDecoration).color!;
+      double contrast(Color a, Color b) {
+        final x = a.computeLuminance(), y = b.computeLuminance();
+        return ((x > y ? x : y) + .05) / ((x > y ? y : x) + .05);
+      }
+
+      expect(
+        contrast(sheet.blockquote!.color!, background),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(contrast(sheet.a!.color!, background), greaterThanOrEqualTo(4.5));
+      expect(background.computeLuminance(), lessThan(.1));
+      final light = roundupMarkdownStyle(
+        ThemeData.light().copyWith(
+          textTheme: ThemeData.light().textTheme.copyWith(
+            bodyMedium: const TextStyle(fontSize: 14),
+          ),
+        ),
+      );
+      expect(
+        contrast(
+          light.blockquote!.color!,
+          (light.blockquoteDecoration! as BoxDecoration).color!,
+        ),
+        greaterThanOrEqualTo(4.5),
+      );
+      await capture(t, 'readable-quote-preview');
       expect(t.takeException(), isNull);
       await t.pumpWidget(const SizedBox());
       await t.pump(const Duration(milliseconds: 10));

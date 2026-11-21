@@ -36,6 +36,7 @@ class _BookmarkSummaryDialogState extends State<BookmarkSummaryDialog> {
     return AlertDialog(
       title: const Text('Your thought'),
       content: TextField(
+        textCapitalization: TextCapitalization.sentences,
         controller: _controller,
         maxLines: 4,
         decoration: const InputDecoration(

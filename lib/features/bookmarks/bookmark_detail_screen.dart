@@ -1,11 +1,13 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../widgets/editor_text_field.dart';
 import '../../core/utils/content_utils.dart';
 import '../../data/database/app_database.dart';
-import '../publish/roundup_provider.dart';
+import '../capture/include_this_week_button.dart';
 import 'bookmark_provider.dart';
 
 class BookmarkDetailScreen extends ConsumerStatefulWidget {
@@ -27,6 +29,7 @@ class _BookmarkDetailScreenState extends ConsumerState<BookmarkDetailScreen> {
   Future<bool> writes = Future.value(true);
   int generation = 0;
   late List<String> persisted;
+  late List<String> queued;
   @override
   void initState() {
     super.initState();
@@ -48,10 +51,12 @@ class _BookmarkDetailScreenState extends ConsumerState<BookmarkDetailScreen> {
         excerpt.text = b.contentText ?? '';
         note.text = b.summary ?? '';
         persisted = values;
+        queued = values;
       });
       for (final c in [title, url, excerpt, note]) {
         c.addListener(() {
-          if (mounted) {
+          if (mounted && !listEquals(values, queued)) {
+            queued = values;
             setState(() => changed = true);
             unawaited(save());
           }
@@ -111,26 +116,12 @@ class _BookmarkDetailScreenState extends ConsumerState<BookmarkDetailScreen> {
     return writes;
   }
 
-  Future<void> include() async {
+  Future<bool> prepareInclude() async {
     if (url.text.trim().isNotEmpty && safeWebUrl(url.text) == null) {
       setState(() => error = 'Enter a valid http or https source URL.');
-      return;
+      return false;
     }
-    if (!await save()) return;
-    final b = await ref.read(bookmarkRepositoryProvider).get(widget.id);
-    final issue = await ref.read(roundupRepositoryProvider).ensureWeek();
-    if (b != null) {
-      await ref.read(roundupRepositoryProvider).include(issue.id, b);
-    }
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Included in this week’s draft. Edit the public text there.',
-          ),
-        ),
-      );
-    }
+    return save();
   }
 
   Future<void> leave() async {
@@ -189,13 +180,13 @@ class _BookmarkDetailScreenState extends ConsumerState<BookmarkDetailScreen> {
                         color: Theme.of(context).colorScheme.error,
                       ),
                     ),
-                  TextField(
+                  EditorTextField(
                     controller: title,
                     maxLines: null,
                     decoration: const InputDecoration(labelText: 'Title'),
                   ),
                   const SizedBox(height: 20),
-                  TextField(
+                  EditorTextField(
                     controller: note,
                     minLines: 3,
                     maxLines: null,
@@ -207,10 +198,10 @@ class _BookmarkDetailScreenState extends ConsumerState<BookmarkDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: saving ? null : include,
-                    icon: const Icon(Icons.playlist_add),
-                    label: const Text('Include this week'),
+                  IncludeThisWeekButton(
+                    bookmarkId: widget.id,
+                    filled: true,
+                    beforeInclude: prepareInclude,
                   ),
                   const SizedBox(height: 16),
                   Wrap(
@@ -240,7 +231,7 @@ class _BookmarkDetailScreenState extends ConsumerState<BookmarkDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  TextField(
+                  EditorTextField(
                     controller: excerpt,
                     minLines: 3,
                     maxLines: null,
@@ -249,9 +240,10 @@ class _BookmarkDetailScreenState extends ConsumerState<BookmarkDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
+                  EditorTextField(
                     controller: url,
                     keyboardType: TextInputType.url,
+                    textCapitalization: TextCapitalization.none,
                     decoration: const InputDecoration(labelText: 'Source URL'),
                   ),
                   const SizedBox(height: 24),
